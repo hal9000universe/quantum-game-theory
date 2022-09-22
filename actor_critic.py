@@ -39,11 +39,17 @@ class Actor(Module):
 
     def __init__(self):
         super(Actor, self).__init__()
-        self._lin1 = Linear(8, 4)
+        self._lin1 = Linear(8, 128)
+        self._lin2 = Linear(128, 64)
+        self._final = Linear(64, 4)
         self._soft_plus = Softplus()
 
     def __call__(self, x: Tensor) -> Tensor:
         x = self._lin1(x)
+        x = relu(x)
+        x = self._lin2(x)
+        x = relu(x)
+        x = self._final(x)
         x = self._soft_plus(x)
         return x
 
@@ -85,6 +91,7 @@ class AliceBobCritic:
         self._replay_buffer = replay_buffer
         self._alice_optimizer = alice_optimizer
         self._bob_optimizer = bob_optimizer
+        self._episodes = 100000
         self._epsilon = 0.3
         self._param_dist = Uniform(0., 2*pi)
         # self._critic_optimizer = critic_optimizer
@@ -95,13 +102,14 @@ class AliceBobCritic:
             theta_a, phi_a, theta_b, phi_b = self._param_dist.sample((4,))
         else:
             theta_a, phi_a = sample(self._alice(state_representation))
-            theta_b, phi_b = sample(self._alice(state_representation))
-        return theta_a, phi_a, theta_b, phi_b
+            # theta_b, phi_b = sample(self._alice(state_representation))
+        return theta_a, phi_a, theta_a, phi_a
 
     def run(self):
-        for episode in range(100000):
+        for episode in range(self._episodes):
             state: State = self._env.reset()
             theta_a, phi_a, theta_b, phi_b = self._choose_actions(state)
+            # theta_a, phi_a, theta_b, phi_b = tensor(0), tensor(pi/2), tensor(0), tensor(pi/2)
             self._env.step(theta_a, phi_a, theta_b, phi_b, state.long())
             states, actions_alice, actions_bob, reward_alice, reward_bob = sample_batch(
                 self._replay_buffer.size,
@@ -123,12 +131,12 @@ class AliceBobCritic:
             loss_bob: Tensor = compute_loss(self._alice(states), actions_bob, delta_bob)
 
             self._alice_optimizer.zero_grad()
-            # self._bob_optimizer.zero_grad()
+            self._bob_optimizer.zero_grad()
 
             loss_alice.backward()
             loss_bob.backward()
 
-            self._alice_optimizer.step()
+            # self._alice_optimizer.step()
             # self._bob_optimizer.step()
 
             if episode % 100 == 0:
@@ -154,18 +162,4 @@ if __name__ == '__main__':
     # c_optim = Adam(c.parameters())
 
     abc = AliceBobCritic(a, b, c, environment, rep_buf, a_optim, b_optim)
-    # abc.run()
-
-    identity = tensor([[1., 0.], [0., 1.]])
-    rot = rotation_matrix(tensor(pi), tensor(1.3))
-    s = State()
-    print(f"normal state: {s}")
-    s1 = State()
-    s1.representation = kron(identity, rot) @ (kron(rot, identity) @ s1.representation)
-    print(f"alice then bob state: {s1}")
-    s2 = State()
-    s2.representation = kron(rot, identity) @ (kron(identity, rot) @ s2.representation)
-    print(f"bob then alice state: {s2}")
-    s3 = State()
-    s3.representation = kron(rot, rot) @ s3.representation
-    print(f"simultaneously alice and bob state: {s3}")
+    abc.run()

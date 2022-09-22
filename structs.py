@@ -19,7 +19,7 @@ class State:
     _bases: List[Tuple[bool, bool]]
 
     def __init__(self):
-        self._representation = tensor([1., 0, 0, 1.], dtype=complex64) / sqrt(tensor(2, dtype=complex64))
+        self._representation = tensor([1., 0, 0, 1.], dtype=complex64) / sqrt(tensor(2., dtype=complex64))
         self._bases = [(False, False), (False, True), (True, False), (True, True)]
 
     def measure(self) -> int:
