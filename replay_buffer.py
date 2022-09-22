@@ -1,5 +1,4 @@
 # py
-import numba
 from typing import Tuple, List
 
 # nn & rl
@@ -79,7 +78,9 @@ def sample_batch(num_samples: int,
                  rewards_bob: Tensor,
                  batch_size: int
                  ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    # define indices in replay buffer which are going to be sampled
     random_indices: Tensor = randint(high=num_samples, size=(batch_size,))
+    # create batch containing states, the actions taken by alice and bob, as well as the subsequently received rewards
     batch = (
         states[random_indices],
         actions_alice[random_indices],

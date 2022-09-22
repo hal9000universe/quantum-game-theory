@@ -1,5 +1,4 @@
 # py
-import numba
 from typing import Tuple, List
 
 # nn & rl
@@ -7,6 +6,7 @@ from torch import exp, cos, sin, square, sqrt, kron, tensor, Tensor, abs, comple
 
 
 def rotation_matrix(theta: Tensor, phi: Tensor) -> Tensor:
+    # defines a rotation matrix and returns it
     a = exp(1j * phi) * cos(theta / 2)
     b = sin(theta / 2)
     c = - sin(theta / 2)
@@ -59,6 +59,7 @@ class Operator:
 
     @staticmethod
     def act(theta_a: Tensor, phi_a: Tensor, theta_b: Tensor, phi_b: Tensor, state: Tensor) -> Tensor:
+        # applies rotation matrices defined by theta_i, phi_i to the state of the system
         alice_rot: Tensor = rotation_matrix(theta_a, phi_a)
         bob_rot: Tensor = rotation_matrix(theta_b, phi_b)
         matrix_representation = kron(alice_rot, bob_rot)
