@@ -35,7 +35,7 @@ class Env:
 
     def step(self, theta_a: Tensor, phi_a: Tensor, theta_b: Tensor, phi_b: Tensor, state_representation: Tensor):
         # apply operator defined by theta_i, phi_i to the state of the system
-        self._state._representation = self._op.act(theta_a, phi_a, theta_b, phi_b, self._state.representation)
+        self._state._representation = self._op.rotate_qubits(theta_a, phi_a, theta_b, phi_b, self._state.representation)
         # measure the state
         measurement = self._state.measure()
         # assign a reward according to the rules of the game

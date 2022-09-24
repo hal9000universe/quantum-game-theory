@@ -73,7 +73,7 @@ class Agent:
             prob_params = self._network(state)
             guess = sample(prob_params)
             reward = self._env.step(guess)
-            loss: Tensor = -reward * log_prob(guess, prob_params)
+            loss: Tensor = -reward * log_prob(guess, prob_params)  # reward * log prob !
             self._optimizer.zero_grad()
             loss.backward()
             self._optimizer.step()

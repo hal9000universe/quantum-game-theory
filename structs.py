@@ -2,7 +2,7 @@
 from typing import Tuple, List
 
 # nn & rl
-from torch import exp, cos, sin, square, sqrt, kron, tensor, Tensor, abs, complex64, concat, real, imag
+from torch import exp, cos, sin, square, sqrt, kron, tensor, Tensor, abs, complex64, concat, real, imag, eye
 
 
 def rotation_matrix(theta: Tensor, phi: Tensor) -> Tensor:
@@ -57,10 +57,28 @@ class State:
 
 class Operator:
 
+    def __init__(self):
+        self.hadamard = tensor([[1., 1.], [1., -1.]], dtype=complex64) / sqrt(tensor(2.))
+        self.cnot = tensor([[1., 0., 0., 0.],
+                            [0., 1., 0., 0.],
+                            [0., 0., 0., 1.],
+                            [0., 0., 1., 0.]], dtype=complex64)
+        self.identity = eye(2, dtype=complex64)
+
+    def cnot(self, multi_qubit_system: Tensor):
+        return self.cnot @ multi_qubit_system
+
     @staticmethod
-    def act(theta_a: Tensor, phi_a: Tensor, theta_b: Tensor, phi_b: Tensor, state: Tensor) -> Tensor:
-        # applies rotation matrices defined by theta_i, phi_i to the state of the system
-        alice_rot: Tensor = rotation_matrix(theta_a, phi_a)
-        bob_rot: Tensor = rotation_matrix(theta_b, phi_b)
+    def rotation_matrix(theta: Tensor, phi: Tensor) -> Tensor:
+        # defines a rotation matrix and returns it
+        a = exp(1j * phi) * cos(theta / 2)
+        b = sin(theta / 2)
+        c = - sin(theta / 2)
+        d = exp(-1j * phi) * cos(theta / 2)
+        return tensor([[a, b], [c, d]])
+
+    def rotate_qubits(self, theta_a: Tensor, phi_a: Tensor, theta_b: Tensor, phi_b: Tensor, state: Tensor) -> Tensor:
+        alice_rot: Tensor = self.rotation_matrix(theta_a, phi_a)
+        bob_rot: Tensor = self.rotation_matrix(theta_b, phi_b)
         matrix_representation = kron(alice_rot, bob_rot)
         return matrix_representation @ state
