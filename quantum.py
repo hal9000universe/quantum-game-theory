@@ -1,4 +1,4 @@
-from torch import Tensor, tensor, complex64, sqrt, eye, kron, conj
+from torch import Tensor, tensor, complex64, sqrt, eye, kron, conj, real, imag, concat, exp, sin, cos
 from torch.nn.functional import one_hot
 
 
@@ -63,14 +63,15 @@ class CNOT(Operator):
 
 class Rotation(Operator):
 
-    def __init__(self):
-        matrix_representation = eye(2, dtype=complex64)
+    def __init__(self, matrix_representation: Tensor = eye(2, dtype=complex64)):
         super(Rotation, self).__init__(matrix_representation=matrix_representation)
 
-    def inject(self, theta: Tensor, phi: Tensor, state: Tensor) -> Tensor:
-        self._matrix_representation = tensor([[exp(1j * phi) * cos(theta / 2), sin(theta / 2)],
-                                              [-sin(theta / 2), exp(-1j * phi) * cos(theta / 2)]], dtype=complex64)
-        return self.apply(state)
+    @classmethod
+    def inject(cls, theta: Tensor, phi: Tensor) -> Operator:
+        matrix_representation = tensor([[exp(1j * phi) * cos(theta / 2), sin(theta / 2)],
+                                        [-sin(theta / 2), exp(-1j * phi) * cos(theta / 2)]], dtype=complex64,
+                                       requires_grad=True)
+        return cls(matrix_representation=matrix_representation)
 
 
 class General(Operator):
@@ -109,14 +110,14 @@ class Preparation(Operator):
 
 
 class Ops:
-    identity: Operator
-    hadamard: Operator
-    cnot: Operator
-    rotation: Operator
-    general: Operator
-    cooperate: Operator
-    defect: Operator
-    preparation: Operator
+    identity: Identity
+    hadamard: Hadamard
+    cnot: CNOT
+    rotation: Rotation
+    general: General
+    cooperate: Cooperate
+    defect: Defect
+    preparation: Preparation
 
     def __init__(self):
         self.identity = Identity()
@@ -154,6 +155,10 @@ class QuantumSystem:
         assert state.size(dim=0) == pow(2, self._num_qubits)
         self._state = normalize(state)
 
+    @property
+    def real_state(self) -> Tensor:
+        return concat((real(self._state), imag(self._state)))
+
     def reset(self):
         self._state = one_hot(tensor(0), classes=pow(2, self._num_qubits))
 
@@ -165,22 +170,22 @@ class QuantumSystem:
 
 
 class TwoQubitSystem(QuantumSystem):
-    _ops: Ops
+    ops: Ops
 
     def __init__(self):
         super(TwoQubitSystem, self).__init__(num_qubits=2)
-        self._ops = Ops()
+        self.ops = Ops()
 
     def prepare_state(self):
-        self._state = self._ops.preparation.apply(self._state)
+        self._state = self.ops.preparation.apply(self._state)
 
     def check_conditions(self) -> bool:
-        def_def_mat = kron(self._ops.defect.matrix_representation, self._ops.defect.matrix_representation)
-        prep_def_def_commute = commute(self._ops.preparation.matrix_representation, def_def_mat)
-        def_coop_mat = kron(self._ops.defect.matrix_representation, self._ops.cooperate.matrix_representation)
-        prep_def_coop_commute = commute(self._ops.preparation.matrix_representation, def_coop_mat)
-        coop_def_mat = kron(self._ops.cooperate.matrix_representation, self._ops.defect.matrix_representation)
-        prep_coop_def_commute = commute(self._ops.preparation.matrix_representation, coop_def_mat)
+        def_def_mat = kron(self.ops.defect.matrix_representation, self.ops.defect.matrix_representation)
+        prep_def_def_commute = commute(self.ops.preparation.matrix_representation, def_def_mat)
+        def_coop_mat = kron(self.ops.defect.matrix_representation, self.ops.cooperate.matrix_representation)
+        prep_def_coop_commute = commute(self.ops.preparation.matrix_representation, def_coop_mat)
+        coop_def_mat = kron(self.ops.cooperate.matrix_representation, self.ops.defect.matrix_representation)
+        prep_coop_def_commute = commute(self.ops.preparation.matrix_representation, coop_def_mat)
         if prep_def_def_commute and prep_def_coop_commute and prep_coop_def_commute:
             return True
         else:

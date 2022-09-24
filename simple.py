@@ -1,9 +1,11 @@
 from torch import tensor, Tensor, relu, normal
 from torch.nn import Module, Linear, Softplus
-from torch.distributions import Normal
+from torch.distributions import Normal, Uniform
 from torch.optim import Adam
 from statistics import mean
 from typing import List
+from random import uniform
+from math import exp
 
 
 class Env:
@@ -52,7 +54,7 @@ class Network(Module):
 
 
 def sample(params: Tensor) -> Tensor:
-    return normal(params[0], params[1])
+    return normal(*params)
 
 
 def log_prob(guess: Tensor, params: Tensor) -> Tensor:
@@ -68,17 +70,21 @@ class Agent:
         self._optimizer = Adam(network.parameters())
 
     def train(self):
+        rand_dist = Uniform(-2000., 2000.)
         for episode in range(10000000):
             state = self._env.reset()
             prob_params = self._network(state)
-            guess = sample(prob_params)
+            if uniform(0., 1.) < exp(-episode):
+                guess = rand_dist.sample()
+            else:
+                guess = sample(prob_params)
             reward = self._env.step(guess)
             loss: Tensor = -reward * log_prob(guess, prob_params)  # reward * log prob !
             self._optimizer.zero_grad()
             loss.backward()
             self._optimizer.step()
             if episode % 1000 == 0:
-                print(guess.item())
+                print(f'{guess.item():.5}')
 
 
 if __name__ == '__main__':
