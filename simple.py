@@ -1,4 +1,4 @@
-from torch import tensor, Tensor, relu, normal
+from torch import tensor, Tensor, relu, normal, full
 from torch.nn import Module, Linear, Softplus
 from torch.distributions import Normal, Uniform
 from torch.optim import Adam
@@ -14,7 +14,7 @@ class Env:
     _out: Tensor
 
     def __init__(self):
-        self._number = tensor(1000.)
+        self._number = tensor(1524.)
         self._rewards = list()
         self._out = tensor([1., 1., 1., 1.])
 
@@ -38,8 +38,11 @@ class Network(Module):
     def __init__(self):
         super(Network, self).__init__()
         self._lin1 = Linear(4, 64)
+        self._lin1.weight.data = full((64, 4), 1.)
         self._lin2 = Linear(64, 32)
+        self._lin2.weight.data = full((32, 64), 1.)
         self._lin3 = Linear(32, 2)
+        self._lin3.weight.data = full((2, 32), 1.)
         self._soft_plus = Softplus()
         self._stabilizer = tensor([0., 1e-4])
 
@@ -58,7 +61,7 @@ def sample(params: Tensor) -> Tensor:
 
 
 def log_prob(guess: Tensor, params: Tensor) -> Tensor:
-    dist = Normal(params[0], params[1])
+    dist = Normal(*params)
     return dist.log_prob(guess)
 
 

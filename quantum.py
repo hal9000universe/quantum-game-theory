@@ -131,7 +131,7 @@ class Ops:
 
 
 def normalize(state: Tensor) -> Tensor:
-    norm = state.abs().sum()
+    norm = state.abs().square().sum()
     if norm == 1.:
         return state
     else:
@@ -159,14 +159,18 @@ class QuantumSystem:
     def real_state(self) -> Tensor:
         return concat((real(self._state), imag(self._state)))
 
-    def reset(self):
-        self._state = one_hot(tensor(0), classes=pow(2, self._num_qubits))
+    def _collapse(self, state: int):
+        self._state = one_hot(tensor(state), pow(2, self._num_qubits)).type(complex64)
 
     def measure(self) -> int:
         probs: Tensor = self._state.abs().square()
-        measurement: int = probs.multinomial(num_samples=1, replacement=True)
-        self._reset()
+        measurement: int = probs.multinomial(num_samples=1, replacement=True).item()
+        self._collapse(measurement)
         return measurement
+
+    def __repr__(self) -> str:
+        a, b = self._state
+        return f'{a:.2}|0> + {b:.2}|1>'
 
 
 class TwoQubitSystem(QuantumSystem):
@@ -198,4 +202,5 @@ class TwoQubitSystem(QuantumSystem):
 
 if __name__ == '__main__':
     system = TwoQubitSystem()
-    print(system.check_conditions())
+    print(f'state: {system}')
+    print(f'measurement: {system.measure()}')

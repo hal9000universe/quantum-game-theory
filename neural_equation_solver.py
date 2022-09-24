@@ -26,10 +26,6 @@ class Network(Module):
         return x
 
 
-def sample(params: Tensor) -> Tensor:
-    return normal(*params)
-
-
 if __name__ == '__main__':
     net = Network()
     optim = Adam(net.parameters(), lr=1e-5)
