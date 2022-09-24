@@ -1,6 +1,9 @@
+# py
+from math import pi
+
+# nn & rl
 from torch import Tensor, tensor, complex64, sqrt, eye, kron, conj, real, imag, concat, exp, sin, cos
 from torch.nn.functional import one_hot
-from math import pi
 
 
 def adjoint(matrix: Tensor) -> Tensor:
@@ -185,7 +188,7 @@ class TwoQubitSystem(QuantumSystem):
         self._state = self.ops.preparation.apply(self._state)
 
     def check_conditions(self) -> bool:
-        # add condition that the preparation operator is hermitian (A*T = A)
+        # TODO: add condition that the preparation operator is hermitian (A*T = A)
         def_def_mat = kron(self.ops.defect.matrix_representation, self.ops.defect.matrix_representation)
         prep_def_def_commute = commute(self.ops.preparation.matrix_representation, def_def_mat)
         def_coop_mat = kron(self.ops.defect.matrix_representation, self.ops.cooperate.matrix_representation)
@@ -205,3 +208,6 @@ class TwoQubitSystem(QuantumSystem):
 if __name__ == '__main__':
     system = TwoQubitSystem()
     print(system)
+
+
+# TODO: find configuration which results in |11>

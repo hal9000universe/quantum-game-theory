@@ -95,3 +95,7 @@ if __name__ == '__main__':
     netw = Network()
     agen = Agent(envi, netw)
     agen.train()
+
+
+# TODO: stabilize learning across all scales (e.g. target = 1.)
+# TODO: enable learning until convergence
