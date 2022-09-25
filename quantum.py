@@ -109,7 +109,7 @@ class Defect(Operator):
 class Prepare(Operator):
 
     def __init__(self):
-        entanglement_parameter = tensor(pi / 2)
+        entanglement_parameter = tensor(pi)
         def_mat = Defect().matrix_representation
         matrix_representation = matrix_exp(-1j * entanglement_parameter * kron(def_mat, def_mat) / 2)
         super(Prepare, self).__init__(matrix_representation=matrix_representation)
@@ -209,4 +209,5 @@ if __name__ == '__main__':
     nash_eq = tensor([[1j, 0.],
                       [0., -1j]], dtype=complex64)
     rot_mat = kron(nash_eq, nash_eq)
-
+    system.state = system.ops.general.inject(rot_mat, system.state)
+    print(system)

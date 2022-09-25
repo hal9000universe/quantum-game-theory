@@ -17,7 +17,7 @@ class Env:
     def __init__(self):
         self._system = TwoQubitSystem()
         assert self._system.check_conditions()
-        self._target = tensor([0., 0., 0., 1.], dtype=complex64)
+        self._target = tensor([0., 0., 0., 1j], dtype=complex64)
         self._scale_factor = tensor(100., dtype=complex64)
         self._max_reward = 100.
 
@@ -29,9 +29,8 @@ class Env:
     def step(self, operator: Tensor) -> Tensor:
         matrix = kron(operator, operator)
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
-        self._system.prepare_state()
-        dif = (self._scale_factor * (self._target - self._system.state)).abs().square().sum()
-        reward = tensor(self._max_reward, dtype=complex64, requires_grad=True) - dif
+        dif: Tensor = self._target - self._system.state
+        reward = -self._scale_factor * dif.abs().square().sum()
         return reward
 
 
@@ -78,6 +77,7 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if epi % 1000 == 0:
+        if epi % 10000 == 0:
             print(params)
             print(rot_mat)
+            print(loss)
