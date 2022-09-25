@@ -1,9 +1,9 @@
 # py
-# from math import exp
+from math import pi
 from random import uniform
 
 # nn & rl
-from torch import Tensor, tensor, kron, complex64, full, relu, real, exp, sin, cos, view_as_real
+from torch import Tensor, tensor, kron, complex64, full, relu, real, exp, sin, cos, view_as_real, sigmoid
 from torch.nn import Module, Linear
 from torch.optim import Adam
 from scipy.stats import unitary_group
@@ -44,11 +44,14 @@ class ComplexNetwork(Module):
         self._lin2.weight.data = full((32, 64), 0.1, dtype=complex64)
         self._lin3 = Linear(32, 2)
         self._lin3.weight.data = full((2, 32), 1., dtype=complex64)
+        self._scaling = tensor([pi, pi/2])
 
     def __call__(self, x: Tensor) -> Tensor:
         x = self._lin1(x)
         x = self._lin2(x)
         x = self._lin3(x)
+        x = real(x)
+        x = self._scaling * sigmoid(x)
         return x
 
 
@@ -73,17 +76,16 @@ if __name__ == '__main__':
     optimizer = Adam(qnet.parameters())
     i_unit: Tensor = tensor(1j, dtype=complex64)
     for epi in range(1000000):
-        params = qnet(inp)
-        vec = apply_params(*params, inp)
+        theta_angle, phi_angle = qnet(inp)
+        vec = apply_params(theta_angle, phi_angle, inp)
         l = (target[0] - vec[0]).abs().square()
         l += (target[1] - vec[1]).abs().square()
         l += (target[2] - vec[2]).abs().square()
         l += (target[3] - vec[3]).abs().square()
         optimizer.zero_grad()
         l.backward()
-        for param in qnet.parameters():
-            print(param.shape)
-            print(param.grad)
-            exit()
+        optimizer.step()
         if epi % 1000 == 0:
+            print(vec)
             print(l.item())
+            print(theta_angle.item(), phi_angle.item())
