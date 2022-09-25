@@ -2,8 +2,9 @@
 from math import pi
 
 # nn & rl
-from torch import Tensor, tensor, complex64, sqrt, eye, kron, conj, real, imag, concat, exp, sin, cos
+from torch import Tensor, tensor, complex64, sqrt, eye, kron, conj, real, imag, concat, exp, sin, cos, equal
 from torch.nn.functional import one_hot
+from torch.linalg import matrix_exp
 
 
 def adjoint(matrix: Tensor) -> Tensor:
@@ -105,33 +106,34 @@ class Defect(Operator):
         super(Defect, self).__init__(matrix_representation=matrix_representation)
 
 
-class Preparation(Operator):
+class Prepare(Operator):
 
     def __init__(self):
-        matrix_representation = CNOT().matrix_representation @ kron(Hadamard().matrix_representation,
-                                                                    Identity().matrix_representation)
-        super(Preparation, self).__init__(matrix_representation=matrix_representation)
+        entanglement_parameter = tensor(pi/2)
+        def_mat = Defect().matrix_representation
+        matrix_representation = matrix_exp(-1j * entanglement_parameter * kron(def_mat, def_mat) / 2)
+        super(Prepare, self).__init__(matrix_representation=matrix_representation)
 
 
 class Ops:
     identity: Identity
     hadamard: Hadamard
     cnot: CNOT
-    rotation: Rotation
+    rotate: Rotation
     general: General
     cooperate: Cooperate
     defect: Defect
-    preparation: Preparation
+    prepare: Prepare
 
     def __init__(self):
         self.identity = Identity()
         self.hadamard = Hadamard()
         self.cnot = CNOT()
-        self.rotation = Rotation()
+        self.rotate = Rotation()
         self.general = General()
         self.cooperate = Cooperate()
         self.defect = Defect()
-        self.preparation = Preparation()
+        self.prepare = Prepare()
 
 
 def normalize(state: Tensor) -> Tensor:
@@ -185,16 +187,15 @@ class TwoQubitSystem(QuantumSystem):
         self.ops = Ops()
 
     def prepare_state(self):
-        self._state = self.ops.preparation.apply(self._state)
+        self._state = self.ops.prepare.apply(self._state)
 
     def check_conditions(self) -> bool:
-        # TODO: add condition that the preparation operator is hermitian (A*T = A)
         def_def_mat = kron(self.ops.defect.matrix_representation, self.ops.defect.matrix_representation)
-        prep_def_def_commute = commute(self.ops.preparation.matrix_representation, def_def_mat)
+        prep_def_def_commute = commute(self.ops.prepare.matrix_representation, def_def_mat)
         def_coop_mat = kron(self.ops.defect.matrix_representation, self.ops.cooperate.matrix_representation)
-        prep_def_coop_commute = commute(self.ops.preparation.matrix_representation, def_coop_mat)
+        prep_def_coop_commute = commute(self.ops.prepare.matrix_representation, def_coop_mat)
         coop_def_mat = kron(self.ops.cooperate.matrix_representation, self.ops.defect.matrix_representation)
-        prep_coop_def_commute = commute(self.ops.preparation.matrix_representation, coop_def_mat)
+        prep_coop_def_commute = commute(self.ops.prepare.matrix_representation, coop_def_mat)
         if prep_def_def_commute and prep_def_coop_commute and prep_coop_def_commute:
             return True
         else:
@@ -207,7 +208,3 @@ class TwoQubitSystem(QuantumSystem):
 
 if __name__ == '__main__':
     system = TwoQubitSystem()
-    print(system)
-
-
-# TODO: find configuration which results in |11>
