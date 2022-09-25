@@ -3,7 +3,7 @@ from math import pi
 from random import uniform
 
 # nn & rl
-from torch import Tensor, tensor, kron, complex64, full, relu, real, exp, sin, cos, view_as_real, sigmoid
+from torch import Tensor, tensor, kron, complex64, full, relu, real, exp, sin, cos, view_as_real, sigmoid, cat, stack
 from torch.nn import Module, Linear
 from torch.optim import Adam
 from scipy.stats import unitary_group
@@ -27,8 +27,9 @@ class Env:
         return self._system.state
 
     def step(self, operator: Tensor) -> Tensor:
-        matrix = kron(operator, operator).type(complex64)
+        matrix = kron(operator, operator)
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        self._system.prepare_state()
         dif = (self._scale_factor * (self._target - self._system.state)).abs().square().sum()
         reward = tensor(self._max_reward, dtype=complex64, requires_grad=True) - dif
         return reward
@@ -44,7 +45,7 @@ class ComplexNetwork(Module):
         self._lin2.weight.data = full((32, 64), 0.1, dtype=complex64)
         self._lin3 = Linear(32, 2)
         self._lin3.weight.data = full((2, 32), 1., dtype=complex64)
-        self._scaling = tensor([pi, pi/2])
+        self._scaling = tensor([pi, pi / 2])
 
     def __call__(self, x: Tensor) -> Tensor:
         x = self._lin1(x)
@@ -55,37 +56,28 @@ class ComplexNetwork(Module):
         return x
 
 
-def apply_params(theta: Tensor, phi: Tensor, state: Tensor):
-    theta_half: Tensor = theta / 2
-    a: Tensor = exp(2j * phi) * cos(theta_half).square()
-    b: Tensor = exp(1j * phi) * cos(theta_half) * sin(theta_half)
-    c: Tensor = cos(theta_half).square()
-    d: Tensor = sin(theta_half).square()
-    e: Tensor = exp(-2j * phi) * cos(theta_half).square()
-    out1 = a * state[0] + b * state[1] + b * state[2] + d * state[3]
-    out2 = -b * state[0] + c * state[1] + (-d) * state[2] + b * state[3]
-    out3 = -b * state[0] + (-d) * state[1] + c * state[2] + b * state[3]
-    out4 = d * state[0] + b * state[1] + (-b) * state[2] + e * state[3]
-    return out1, out2, out3, out4
+def rotation_operator(theta: Tensor, phi: Tensor) -> Tensor:
+    m11: Tensor = (exp(1j * phi) * cos(theta / 2)).unsqueeze(0)
+    m12: Tensor = sin(theta / 2).unsqueeze(0)
+    m21: Tensor = -m12
+    m22: Tensor = (exp(-1j * phi) * cos(theta / 2)).unsqueeze(0)
+    rotation_matrix = stack((cat((m11, m12)), cat((m21, m22))), dim=0)
+    return rotation_matrix
 
 
 if __name__ == '__main__':
     qnet = ComplexNetwork()
-    inp = tensor([0., 0., 0., -1.], dtype=complex64)
-    target = tensor([0., 0., 0., 1.], dtype=complex64)
+    env = Env()
     optimizer = Adam(qnet.parameters())
-    i_unit: Tensor = tensor(1j, dtype=complex64)
     for epi in range(1000000):
-        theta_angle, phi_angle = qnet(inp)
-        vec = apply_params(theta_angle, phi_angle, inp)
-        l = (target[0] - vec[0]).abs().square()
-        l += (target[1] - vec[1]).abs().square()
-        l += (target[2] - vec[2]).abs().square()
-        l += (target[3] - vec[3]).abs().square()
+        inp = env.reset()
+        params = qnet(inp)
+        rot_mat = rotation_operator(*params)
+        reward_signal = env.step(rot_mat)
+        loss: Tensor = -reward_signal
         optimizer.zero_grad()
-        l.backward()
+        loss.backward()
         optimizer.step()
         if epi % 1000 == 0:
-            print(vec)
-            print(l.item())
-            print(theta_angle.item(), phi_angle.item())
+            print(params)
+            print(rot_mat)

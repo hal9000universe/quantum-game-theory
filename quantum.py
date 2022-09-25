@@ -109,7 +109,7 @@ class Defect(Operator):
 class Prepare(Operator):
 
     def __init__(self):
-        entanglement_parameter = tensor(pi/2)
+        entanglement_parameter = tensor(pi / 2)
         def_mat = Defect().matrix_representation
         matrix_representation = matrix_exp(-1j * entanglement_parameter * kron(def_mat, def_mat) / 2)
         super(Prepare, self).__init__(matrix_representation=matrix_representation)
@@ -161,10 +161,6 @@ class QuantumSystem:
         assert state.size(dim=0) == pow(2, self._num_qubits)
         self._state = normalize(state)
 
-    @property
-    def real_state(self) -> Tensor:
-        return concat((real(self._state), imag(self._state)))
-
     def _collapse(self, state: int):
         self._state = one_hot(tensor(state), pow(2, self._num_qubits)).type(complex64)
 
@@ -208,3 +204,9 @@ class TwoQubitSystem(QuantumSystem):
 
 if __name__ == '__main__':
     system = TwoQubitSystem()
+    system.prepare_state()
+    print(system)
+    nash_eq = tensor([[1j, 0.],
+                      [0., -1j]], dtype=complex64)
+    rot_mat = kron(nash_eq, nash_eq)
+
