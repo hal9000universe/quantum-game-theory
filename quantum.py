@@ -66,10 +66,10 @@ class CNOT(Operator):
         super(CNOT, self).__init__(matrix_representation=matrix_representation)
 
 
-class Rotation(Operator):
+class Rotate(Operator):
 
     def __init__(self, matrix_representation: Tensor = eye(2, dtype=complex64)):
-        super(Rotation, self).__init__(matrix_representation=matrix_representation)
+        super(Rotate, self).__init__(matrix_representation=matrix_representation)
 
     @classmethod
     def inject(cls, theta: Tensor, phi: Tensor) -> Operator:
@@ -119,7 +119,7 @@ class Ops:
     identity: Identity
     hadamard: Hadamard
     cnot: CNOT
-    rotate: Rotation
+    rotate: Rotate
     general: General
     cooperate: Cooperate
     defect: Defect
@@ -129,7 +129,7 @@ class Ops:
         self.identity = Identity()
         self.hadamard = Hadamard()
         self.cnot = CNOT()
-        self.rotate = Rotation()
+        self.rotate = Rotate()
         self.general = General()
         self.cooperate = Cooperate()
         self.defect = Defect()
