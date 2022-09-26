@@ -204,10 +204,5 @@ class TwoQubitSystem(QuantumSystem):
 
 if __name__ == '__main__':
     system = TwoQubitSystem()
-    system.prepare_state()
-    print(system)
-    nash_eq = tensor([[1j, 0.],
-                      [0., -1j]], dtype=complex64)
-    rot_mat = kron(nash_eq, nash_eq)
-    system.state = system.ops.general.inject(rot_mat, system.state)
+    system.state = (system.ops.cnot.matrix_representation @ kron(system.ops.hadamard.matrix_representation, system.ops.identity.matrix_representation)) @ system.state
     print(system)

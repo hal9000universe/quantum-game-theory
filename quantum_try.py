@@ -3,7 +3,8 @@ from math import pi
 from random import uniform
 
 # nn & rl
-from torch import Tensor, tensor, kron, complex64, full, relu, real, exp, sin, cos, view_as_real, sigmoid, cat, stack
+from torch import Tensor, tensor, kron, complex64, full, relu, dot
+from torch import real, exp, sin, cos, view_as_real, sigmoid, cat, stack
 from torch.nn import Module, Linear
 from torch.optim import Adam
 from scipy.stats import unitary_group
@@ -19,7 +20,7 @@ class Env:
         assert self._system.check_conditions()
         self._target = tensor([0., 0., 0., 1j], dtype=complex64)
         self._scale_factor = tensor(100., dtype=complex64)
-        self._max_reward = 100.
+        self._reward_distribution = tensor([1., 3., 3., 6.])
 
     def reset(self) -> Tensor:
         self._system = TwoQubitSystem()
@@ -31,6 +32,12 @@ class Env:
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
         dif: Tensor = self._target - self._system.state
         reward = -self._scale_factor * dif.abs().square().sum()
+        return reward
+
+    def new_step(self, operator: Tensor) -> Tensor:
+        matrix = kron(operator, operator)
+        self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        reward: Tensor = dot(self._reward_distribution, self._system.state.abs().square())
         return reward
 
 
@@ -72,7 +79,7 @@ if __name__ == '__main__':
         inp = env.reset()
         params = qnet(inp)
         rot_mat = rotation_operator(*params)
-        reward_signal = env.step(rot_mat)
+        reward_signal = env.new_step(rot_mat)
         loss: Tensor = -reward_signal
         optimizer.zero_grad()
         loss.backward()
