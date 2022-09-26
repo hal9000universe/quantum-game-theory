@@ -1,9 +1,10 @@
 # py
 from math import pi
 from random import uniform
+from typing import Tuple
 
 # nn & rl
-from torch import Tensor, tensor, kron, complex64, full, relu, dot
+from torch import Tensor, tensor, kron, complex64, full, relu, dot, tensordot
 from torch import real, exp, sin, cos, view_as_real, sigmoid, cat, stack
 from torch.nn import Module, Linear
 from torch.optim import Adam
@@ -21,6 +22,7 @@ class Env:
         self._target = tensor([0., 0., 0., 1j], dtype=complex64)
         self._scale_factor = tensor(100., dtype=complex64)
         self._reward_distribution = tensor([1., 3., 3., 6.])
+        self._multi_reward_distribution = tensor([[1., 1.], [5., 0.], [0., 5.], [3., 3.]]).transpose(0, 1)
 
     def reset(self) -> Tensor:
         self._system = TwoQubitSystem()
@@ -39,6 +41,14 @@ class Env:
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
         reward: Tensor = dot(self._reward_distribution, self._system.state.abs().square())
         return reward
+
+    def multi_step(self, alice_operator: Tensor, bob_operator: Tensor) -> Tuple[Tensor, Tensor]:
+        matrix = kron(alice_operator, bob_operator)
+        self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        probs: Tensor = self._system.state.abs().square()
+        rewards: Tensor = probs * self._multi_reward_distribution
+        reward_alice, reward_bob = rewards.sum(dim=1)
+        return reward_alice, reward_bob
 
 
 class ComplexNetwork(Module):
@@ -72,19 +82,22 @@ def rotation_operator(theta: Tensor, phi: Tensor) -> Tensor:
 
 
 if __name__ == '__main__':
-    qnet = ComplexNetwork()
+    alice: Module = ComplexNetwork()
+    bob: Module = ComplexNetwork()
     env = Env()
-    optimizer = Adam(qnet.parameters())
+    optim = Adam([{'params': alice.parameters()}, {'params': bob.parameters()}])
     for epi in range(1000000):
         inp = env.reset()
-        params = qnet(inp)
-        rot_mat = rotation_operator(*params)
-        reward_signal = env.new_step(rot_mat)
-        loss: Tensor = -reward_signal
-        optimizer.zero_grad()
+        alice_params = alice(inp)
+        bob_params = bob(inp)
+        alice_rot_mat = rotation_operator(*alice_params)
+        bob_rot_mat = rotation_operator(*bob_params)
+        rew_alice, rew_bob = env.multi_step(alice_rot_mat, bob_rot_mat)
+        loss = - (rew_alice + rew_bob)
+
+        optim.zero_grad()
         loss.backward()
-        optimizer.step()
-        if epi % 10000 == 0:
-            print(params)
-            print(rot_mat)
-            print(loss)
+        optim.step()
+
+        if epi % 1000 == 0:
+            print(alice_params, bob_params)
