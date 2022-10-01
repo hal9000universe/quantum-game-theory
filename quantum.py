@@ -109,7 +109,7 @@ class Defect(Operator):
 class Prepare(Operator):
 
     def __init__(self):
-        entanglement_parameter = tensor(pi)
+        entanglement_parameter = tensor(pi / 2)
         def_mat = Defect().matrix_representation
         matrix_representation = matrix_exp(-1j * entanglement_parameter * kron(def_mat, def_mat) / 2)
         super(Prepare, self).__init__(matrix_representation=matrix_representation)

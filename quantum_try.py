@@ -21,8 +21,9 @@ class Env:
         assert self._system.check_conditions()
         self._target = tensor([0., 0., 0., 1j], dtype=complex64)
         self._scale_factor = tensor(100., dtype=complex64)
-        self._reward_distribution = tensor([1., 3., 3., 6.])
-        self._multi_reward_distribution = tensor([[1., 1.], [5., 0.], [0., 5.], [3., 3.]]).transpose(0, 1)
+        self._reward_distribution = tensor([6., 3., 3., 1.])
+        self._smart_reward_distribution = tensor([3., 0., 5., 1.])
+        self._multi_reward_distribution = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]], requires_grad=True).transpose(0, 1)
 
     def reset(self) -> Tensor:
         self._system = TwoQubitSystem()
@@ -32,19 +33,30 @@ class Env:
     def step(self, operator: Tensor) -> Tensor:
         matrix = kron(operator, operator)
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        self._system.prepare_state()
         dif: Tensor = self._target - self._system.state
         reward = -self._scale_factor * dif.abs().square().sum()
         return reward
 
-    def new_step(self, operator: Tensor) -> Tensor:
+    def rl_step(self, operator: Tensor) -> Tensor:
         matrix = kron(operator, operator)
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        self._system.prepare_state()
         reward: Tensor = dot(self._reward_distribution, self._system.state.abs().square())
+        return reward
+
+    def smart_step(self, operator: Tensor) -> Tensor:
+        smart_matrix = tensor([[1j, 0.], [0., -1j]], dtype=complex64)
+        matrix = kron(operator, smart_matrix)
+        self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        self._system.prepare_state()
+        reward: Tensor = dot(self._smart_reward_distribution, self._system.state.abs().square())
         return reward
 
     def multi_step(self, alice_operator: Tensor, bob_operator: Tensor) -> Tuple[Tensor, Tensor]:
         matrix = kron(alice_operator, bob_operator)
         self._system.state = self._system.ops.general.inject(matrix, self._system.state)
+        self._system.prepare_state()
         probs: Tensor = self._system.state.abs().square()
         rewards: Tensor = probs * self._multi_reward_distribution
         reward_alice, reward_bob = rewards.sum(dim=1)
@@ -81,7 +93,62 @@ def rotation_operator(theta: Tensor, phi: Tensor) -> Tensor:
     return rotation_matrix
 
 
-if __name__ == '__main__':
+def base():
+    qnet = ComplexNetwork()
+    env = Env()
+    optim = Adam(qnet.parameters())
+    for epi in range(100000):
+        inp = env.reset()
+        params = qnet(inp)
+        rot_mat = rotation_operator(*params)
+        reward = env.step(rot_mat)
+        loss: Tensor = -reward
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+
+        if epi % 1000 == 0:
+            print(loss.item())
+            print(params)
+
+
+def reinforce():
+    qnet = ComplexNetwork()
+    env = Env()
+    optim = Adam(qnet.parameters())
+    for epi in range(100000):
+        inp = env.reset()
+        params = qnet(inp)
+        rot_mat = rotation_operator(*params)
+        reward = env.rl_step(rot_mat)
+        loss: Tensor = -reward
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+
+        if epi % 1000 == 0:
+            print(params)
+
+
+def smart_opponent():
+    qnet = ComplexNetwork()
+    env = Env()
+    optim = Adam(qnet.parameters())
+    for epi in range(100000):
+        inp = env.reset()
+        params = qnet(inp)
+        rot_mat = rotation_operator(*params)
+        reward = env.smart_step(rot_mat)
+        loss: Tensor = -reward
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+
+        if epi % 1000 == 0:
+            print(params)
+
+
+def multi():
     alice: Module = ComplexNetwork()
     bob: Module = ComplexNetwork()
     env = Env()
@@ -101,3 +168,7 @@ if __name__ == '__main__':
 
         if epi % 1000 == 0:
             print(alice_params, bob_params)
+
+
+if __name__ == '__main__':
+    smart_opponent()
