@@ -16,7 +16,7 @@ def main(theta_noise=tensor(0.), phi_noise=tensor(0.)):
     # construct gate to prepare initial state
     D = tensor([[0., 1.], [1., 0.]], dtype=complex64)
     gamma = pi / 2
-    J = matrix_exp(1j * gamma * kron(D, D) / 2)
+    J = matrix_exp(-1j * gamma * kron(D, D) / 2)
 
     # prepare initial state
     initial_state = J @ ground_state
@@ -47,4 +47,5 @@ if __name__ == '__main__':
     for theta_step in theta_noise_range:
         for phi_step in phi_noise_range:
             opt, sub, is_opt = main(theta_step, phi_step)
-            print(is_opt.item())
+            print(opt, sub, is_opt.item())
+        exit()
