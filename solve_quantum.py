@@ -28,7 +28,7 @@ class Env:
         gamma = pi / 2
         self._J = matrix_exp(-1j * gamma * kron(D, D) / 2)
         # rewards
-        self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
+        self._rewards = tensor([[3., 3.], [5., 0.], [0., 5.], [1., 1.]])
 
     def reset(self) -> Tensor:
         # prepare ground state
@@ -37,7 +37,7 @@ class Env:
 
     def step(self, a1: Tensor, a2: Tensor):
         rot1, rot2 = rotation_operator(a1), rotation_operator(a2)
-        self._state = kron(rot2, rot1) @ self._state
+        self._state = kron(rot1, rot2) @ self._state
         self._state = self._J.conj() @ self._state
         reward1 = (self._rewards[:, 0] * self._state.abs().square()).sum()
         reward2 = (self._rewards[:, 1] * self._state.abs().square()).sum()
@@ -65,74 +65,25 @@ class ComplexNetwork(Module):
         return x
 
 
-class QNetwork(Module):
-
-    def __init__(self):
-        super(QNetwork, self).__init__()
-        self._linx1 = Linear(4, 100)
-        self._linx1.weight.data = full((100, 4), 0.01, dtype=complex64)
-        self._linx2 = Linear(100, 32)
-        self._lina1 = Linear(4, 100)
-        self._lina2 = Linear(100, 32)
-        self._lin1 = Linear(32, 16)
-        self._lin2 = Linear(16, 1)
-
-    def __call__(self, x: Tensor, a: Tensor) -> Tensor:
-        x = self._linx1(x)
-        x = real(x)
-        x = relu(x)
-        x = self._linx2(x)
-        a = self._lina1(a)
-        a = relu(a)
-        a = self._lina2(a)
-        z = x + a
-        z = self._lin1(z)
-        z = relu(z)
-        z = self._lin2(z)
-        return z
-
-
 def main():
     env = Env()
     alice = ComplexNetwork()
-    q_alice = QNetwork()
     bob = ComplexNetwork()
-    q_bob = QNetwork()
 
-    q_optimizer = Adam(params=chain(q_alice.parameters(), q_bob.parameters()))
     ac_optimizer = Adam(params=chain(alice.parameters(), bob.parameters()))
 
     for step in range(100000):
         state = env.reset()
 
-        ac_alice = alice(state)
+        # ac_alice = alice(state)
+        ac_alice = tensor([0., pi / 2])
         ac_bob = bob(state)
 
         rew_alice, rew_bob = env.step(ac_alice, ac_bob)
 
-        # update q-networks
-        ac = cat((ac_alice, ac_bob)).view(4)
-        q_val_alice = q_alice(state, ac)
-        q_val_bob = q_bob(state, ac)
-
-        q_loss_alice = (q_val_alice - rew_alice).square()
-        q_loss_bob = (q_val_bob - rew_bob).square()
-        q_loss = q_loss_alice + q_loss_bob
-
-        q_optimizer.zero_grad()
-        q_loss.backward()  # alternatively retain_graph=True
-        q_optimizer.step()
-
         # update agents
-        ac_alice = alice(state)
-        ac_bob = bob(state)
-
-        ac = cat((ac_alice, ac_bob)).view(4)
-        q_val_alice = q_alice(state, ac)
-        q_val_bob = q_bob(state, ac)
-
-        alice_loss = -q_val_alice
-        bob_loss = -q_val_bob
+        alice_loss = -rew_alice
+        bob_loss = -rew_bob
         pg_loss = alice_loss + bob_loss
 
         ac_optimizer.zero_grad()

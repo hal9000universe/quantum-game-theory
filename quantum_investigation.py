@@ -32,11 +32,12 @@ def main(theta_noise=tensor(0.), phi_noise=tensor(0.)):
 
     # final state
     final_state = J.transpose(0, 1).conj() @ altered_state
+    print(final_state)
 
     # calculate rewards
-    rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
-    bob_strat_reward = (rewards[:, 0] * final_state.abs().square()).sum()
-    optimal_strat_reward = (rewards[:, 1] * final_state.abs().square()).sum()
+    rewards = tensor([[3., 3.], [5., 0.], [0., 5.], [1., 1.]])
+    optimal_strat_reward = (rewards[:, 0] * final_state.abs().square()).sum()
+    bob_strat_reward = (rewards[:, 1] * final_state.abs().square()).sum()
     optimal = optimal_strat_reward >= bob_strat_reward
     return optimal_strat_reward, bob_strat_reward, optimal
 
@@ -48,4 +49,3 @@ if __name__ == '__main__':
         for phi_step in phi_noise_range:
             opt, sub, is_opt = main(theta_step, phi_step)
             print(opt, sub, is_opt.item())
-        exit()
