@@ -1,6 +1,7 @@
 # py
 from math import pi
-from random import uniform
+from statistics import mean
+from random import uniform, randint
 from typing import Tuple
 
 # nn & rl
@@ -171,4 +172,28 @@ def multi():
 
 
 if __name__ == '__main__':
-    smart_opponent()
+    multi()
+
+
+# m = 2
+#     n = 20
+#
+#     # empirical estimation
+#     vs = []
+#     for i in range(10000):
+#         ts = []
+#         for turn in range(m):
+#             ts.append(randint(1, n))
+#         v = max(ts)
+#         vs.append(v)
+#     emp_exp_val = mean(vs)
+#     print(emp_exp_val)
+#
+#     # mathematical formula
+#     base_prob = 1 / (n ** m)
+#     mat_exp_val = 0
+#     for j in range(1, n + 1):
+#         num_pos = (j ** m) - ((j - 1) ** m)
+#         prob = base_prob * num_pos
+#         mat_exp_val += j * prob
+#     print(mat_exp_val)

@@ -26,7 +26,7 @@ class Operator:
         self._matrix_representation = matrix_representation
 
     @property
-    def matrix_representation(self) -> Tensor:
+    def mat(self) -> Tensor:
         return self._matrix_representation
 
     def apply(self, state: Tensor) -> Tensor:
@@ -110,7 +110,7 @@ class Prepare(Operator):
 
     def __init__(self):
         entanglement_parameter = tensor(pi / 2)
-        def_mat = Defect().matrix_representation
+        def_mat = Defect().mat
         matrix_representation = matrix_exp(-1j * entanglement_parameter * kron(def_mat, def_mat) / 2)
         super(Prepare, self).__init__(matrix_representation=matrix_representation)
 
@@ -186,12 +186,12 @@ class TwoQubitSystem(QuantumSystem):
         self._state = self.ops.prepare.apply(self._state)
 
     def check_conditions(self) -> bool:
-        def_def_mat = kron(self.ops.defect.matrix_representation, self.ops.defect.matrix_representation)
-        prep_def_def_commute = commute(self.ops.prepare.matrix_representation, def_def_mat)
-        def_coop_mat = kron(self.ops.defect.matrix_representation, self.ops.cooperate.matrix_representation)
-        prep_def_coop_commute = commute(self.ops.prepare.matrix_representation, def_coop_mat)
-        coop_def_mat = kron(self.ops.cooperate.matrix_representation, self.ops.defect.matrix_representation)
-        prep_coop_def_commute = commute(self.ops.prepare.matrix_representation, coop_def_mat)
+        def_def_mat = kron(self.ops.defect.mat, self.ops.defect.mat)
+        prep_def_def_commute = commute(self.ops.prepare.mat, def_def_mat)
+        def_coop_mat = kron(self.ops.defect.mat, self.ops.cooperate.mat)
+        prep_def_coop_commute = commute(self.ops.prepare.mat, def_coop_mat)
+        coop_def_mat = kron(self.ops.cooperate.mat, self.ops.defect.mat)
+        prep_coop_def_commute = commute(self.ops.prepare.mat, coop_def_mat)
         if prep_def_def_commute and prep_def_coop_commute and prep_coop_def_commute:
             return True
         else:
@@ -203,6 +203,12 @@ class TwoQubitSystem(QuantumSystem):
 
 
 if __name__ == '__main__':
-    system = TwoQubitSystem()
-    system.state = (system.ops.cnot.matrix_representation @ kron(system.ops.hadamard.matrix_representation, system.ops.identity.matrix_representation)) @ system.state
-    print(system)
+    system = QuantumSystem(num_qubits=3)
+    print(system.state)
+    ops = Ops()
+    mat = kron(ops.cnot.mat, ops.identity.mat)
+    system.state = mat @ kron(kron(ops.hadamard.mat, ops.identity.mat), ops.identity.mat) @ system.state
+    print(system.state)
+    system.state = kron(ops.identity.mat, ops.cnot.mat) @ kron(ops.identity.mat, kron(ops.hadamard.mat, ops.identity.mat)) @ system.state
+    print(system.state)
+    print(ops.cnot.mat)

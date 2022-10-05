@@ -14,7 +14,7 @@ class Env:
     _out: Tensor
 
     def __init__(self):
-        self._number = tensor(10.45)
+        self._number = tensor(1000.25)
         self._rewards = list()
         self._out = tensor([1., 1., 1., 1.])
         self._scale_factor = tensor(10000.) / self._number  # stabilize learning across all scales
@@ -119,7 +119,7 @@ class AltAgent:
 
     def train(self):
         rand_dist = Uniform(-2000., 2000.)
-        for episode in range(10000000):
+        for episode in range(250):
             state = self._env.reset()
             if uniform(0., 1.) < exp(-episode):
                 guess = rand_dist.sample()
@@ -130,8 +130,7 @@ class AltAgent:
             self._optimizer.zero_grad()
             loss.backward()
             self._optimizer.step()
-            if episode % 1000 == 0:
-                print(f'{guess.item():.5}')
+            print(f'{guess.item():.5}')
 
 
 if __name__ == '__main__':
@@ -139,6 +138,3 @@ if __name__ == '__main__':
     netw = AltNetwork()
     agen = AltAgent(envi, netw)
     agen.train()
-
-
-# TODO: enable learning until convergence
