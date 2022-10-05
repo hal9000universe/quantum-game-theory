@@ -39,7 +39,7 @@ class Env:
         gamma = pi / 2
         self._J = matrix_exp(-1j * gamma * kron(D, D) / 2)
         # reward distribution
-        self._rewards = tensor([[3., 3.], [5., 0.], [0., 5.], [1., 1.]])
+        self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
 
     def reset(self) -> Tensor:
         # prepare initial state according to Eisert et al. 2020
@@ -64,13 +64,15 @@ class ComplexNetwork(Module):
     _lin1: Linear
     _lin2: Linear
     _lin3: Linear
+    _lin4: Linear
     _scaling: Tensor
 
     def __init__(self):
         super(ComplexNetwork, self).__init__()
-        self._lin1 = Linear(4, 64, dtype=complex64)
-        self._lin2 = Linear(64, 32, dtype=float32)
-        self._lin3 = Linear(32, 2, dtype=float32)
+        self._lin1 = Linear(4, 256, dtype=complex64)
+        self._lin2 = Linear(256, 128)
+        self._lin3 = Linear(128, 64, dtype=float32)
+        self._lin4 = Linear(64, 2, dtype=float32)
         self._scaling = tensor([pi, pi / 2])
 
     def __call__(self, x: Tensor) -> Tensor:
@@ -78,6 +80,7 @@ class ComplexNetwork(Module):
         x = real(x)
         x = self._lin2(x)
         x = self._lin3(x)
+        x = self._lin4(x)
         x = self._scaling * sigmoid(x)
         return x
 
