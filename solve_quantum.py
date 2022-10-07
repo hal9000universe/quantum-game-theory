@@ -2,7 +2,6 @@
 from math import pi
 from itertools import chain
 from typing import Optional, Tuple
-from random import uniform
 
 # nn & rl
 import torch.nn.init
@@ -14,14 +13,20 @@ from torch.nn.init import kaiming_normal_
 from torch.optim import Adam, Optimizer
 
 
-def rotation_operator(a: Tensor) -> Tensor:
-    # construct rotation matrix given by angles in a
-    theta, phi = a
+def rotation_operator(params: Tensor) -> Tensor:
+    """
+    computes and returns a complex rotation matrix given by the angles in params.
+    """
+    theta, phi = params
+    # calculate entries
     a: Tensor = exp(1j * phi) * cos(theta / 2)
     b: Tensor = sin(theta / 2)
+    c: Tensor = -b
     d: Tensor = exp(-1j * phi) * cos(theta / 2)
+    # construct the rows of the rotation matrix
     r1: Tensor = cat((a.view(1), b.view(1)))
-    r2: Tensor = cat((-b.view(1), d.view(1)))
+    r2: Tensor = cat((c.view(1), d.view(1)))
+    # build and return the rotation matrix
     rot: Tensor = cat((r1, r2)).view(2, 2)
     return rot
 
@@ -33,6 +38,12 @@ class Env:
     _rewards = Tensor
 
     def __init__(self):
+        """
+        initializes Env class:
+         Env implements the quantum circuit described in
+         Quantum games and quantum strategies
+         by Eisert et al. 2020.
+        """
         # state variables
         self._state = None
         self._ground_state = tensor([1., 0., 0., 0.], dtype=complex64)
@@ -45,11 +56,14 @@ class Env:
         self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
 
     def reset(self) -> Tensor:
-        # prepare initial state according to Eisert et al. 2020
+        """prepares and returns the initial state according to Eisert et al. 2020."""
         self._state = self._J @ self._ground_state
         return self._state
 
     def step(self, a1: Tensor, a2: Tensor) -> Tuple[Tensor, Tensor]:
+        """
+        calculates and returns the q-values for alice and bob given their respective actions.
+        """
         # create rotation operators given by a1 and a2
         rot1, rot2 = rotation_operator(a1), rotation_operator(a2)
         # apply rotation operators to the quantum system
@@ -57,10 +71,10 @@ class Env:
         # apply adjoint of J
         self._state = self._J.adjoint() @ self._state
         # calculate expected reward respectively
-        reward1: Tensor = (self._rewards[:, 0] * self._state.abs().square()).sum()
-        reward2: Tensor = (self._rewards[:, 1] * self._state.abs().square()).sum()
+        q1: Tensor = (self._rewards[:, 0] * self._state.abs().square()).sum()
+        q2: Tensor = (self._rewards[:, 1] * self._state.abs().square()).sum()
         # return rewards
-        return reward1, reward2
+        return q1, q2
 
 
 class ComplexNetwork(Module):
@@ -72,6 +86,11 @@ class ComplexNetwork(Module):
 
     def __init__(self):
         super(ComplexNetwork, self).__init__()
+        """
+        initializes ComplexNetwork class.
+         ComplexNetwork implements a feed-forward neural network which is capable of handling 
+         4-dimensional complex inputs. 
+        """
         self._lin1 = Linear(4, 128, dtype=complex64)
         self._lin2 = Linear(128, 128, dtype=float32)
         self._lin3 = Linear(128, 128, dtype=float32)
@@ -99,30 +118,36 @@ class ComplexNetwork(Module):
 
 
 def main():
+    # initialize base classes
     env: Env = Env()
     alice: Module = ComplexNetwork()
     bob: Module = ComplexNetwork()
     ac_optimizer: Optimizer = Adam(params=chain(alice.parameters(), bob.parameters()))
 
+    # loop over episodes
     for step in range(10000):
+        # get state from environment
         state = env.reset()
 
+        # compute actions
         ac_alice = alice(state)
         ac_bob = bob(state)
 
-        rew_alice, rew_bob = env.step(ac_alice, ac_bob)
+        # compute q-values
+        q_alice, q_bob = env.step(ac_alice, ac_bob)
 
-        # update agents
-        alice_loss = -rew_alice
-        bob_loss = -rew_bob
+        # define loss
+        alice_loss = -q_alice
+        bob_loss = -q_bob
         pg_loss = alice_loss + bob_loss
 
+        # update agents
         ac_optimizer.zero_grad()
         pg_loss.backward()
         ac_optimizer.step()
 
         if step % 1000 == 0:
-            print(rew_alice.item(), rew_bob.item())
+            print(q_alice.item(), q_bob.item())
             print(ac_alice, ac_bob)
             print('---------')
 
