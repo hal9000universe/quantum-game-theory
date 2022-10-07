@@ -1,14 +1,16 @@
 # py
 from math import pi
 from itertools import chain
-from random import uniform
 from typing import Optional, Tuple
+from random import uniform
 
 # nn & rl
+import torch.nn.init
 from torch import tensor, Tensor, cat, kron, full, real, zeros
 from torch import relu, sigmoid, exp, sin, cos, matrix_exp
 from torch import float32, complex64
 from torch.nn import Module, Linear
+from torch.nn.init import kaiming_normal_
 from torch.optim import Adam, Optimizer
 
 
@@ -35,7 +37,8 @@ class Env:
         self._state = None
         self._ground_state = tensor([1., 0., 0., 0.], dtype=complex64)
         # construct gate to prepare initial state according to Eisert et al. 2020
-        D = tensor([[0., 1.], [1., 0.]], dtype=complex64)
+        D = tensor([[0., 1.],
+                    [-1., 0.]], dtype=complex64)
         gamma = pi / 2
         self._J = matrix_exp(-1j * gamma * kron(D, D) / 2)
         # reward distribution
@@ -52,7 +55,7 @@ class Env:
         # apply rotation operators to the quantum system
         self._state = kron(rot1, rot2) @ self._state
         # apply adjoint of J
-        self._state = self._J.conj().transpose(0, 1) @ self._state
+        self._state = self._J.adjoint() @ self._state
         # calculate expected reward respectively
         reward1: Tensor = (self._rewards[:, 0] * self._state.abs().square()).sum()
         reward2: Tensor = (self._rewards[:, 1] * self._state.abs().square()).sum()
@@ -69,11 +72,21 @@ class ComplexNetwork(Module):
 
     def __init__(self):
         super(ComplexNetwork, self).__init__()
-        self._lin1 = Linear(4, 256, dtype=complex64)
-        self._lin2 = Linear(256, 128)
-        self._lin3 = Linear(128, 64, dtype=float32)
-        self._lin4 = Linear(64, 2, dtype=float32)
+        self._lin1 = Linear(4, 128, dtype=complex64)
+        self._lin2 = Linear(128, 128, dtype=float32)
+        self._lin3 = Linear(128, 128, dtype=float32)
+        self._lin4 = Linear(128, 2, dtype=float32)
         self._scaling = tensor([pi, pi / 2])
+        self.apply(self._initialize)
+
+    @staticmethod
+    def _initialize(m):
+        """
+        Initializes weights using the kaiming-normal distribution and sets weights to zero.
+        """
+        if isinstance(m, Linear):
+            kaiming_normal_(m.weight)
+            m.bias.data.fill_(0.)
 
     def __call__(self, x: Tensor) -> Tensor:
         x = self._lin1(x)
@@ -89,10 +102,9 @@ def main():
     env: Env = Env()
     alice: Module = ComplexNetwork()
     bob: Module = ComplexNetwork()
-
     ac_optimizer: Optimizer = Adam(params=chain(alice.parameters(), bob.parameters()))
 
-    for step in range(100000):
+    for step in range(10000):
         state = env.reset()
 
         ac_alice = alice(state)
@@ -113,6 +125,15 @@ def main():
             print(rew_alice.item(), rew_bob.item())
             print(ac_alice, ac_bob)
             print('---------')
+
+    state = env.reset()
+    ac_al = alice(state)
+    ac_bo = bob(state)
+    reward_a, reward_b = env.step(ac_al, ac_bo)
+    print('actions after training: ')
+    print('alice: {}'.format(ac_al))
+    print('bob: {}'.format(ac_bo))
+    print('reward after training: {} {}'.format(reward_a.item(), reward_b.item()))
 
 
 if __name__ == '__main__':
