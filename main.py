@@ -125,7 +125,7 @@ def main():
     ac_optimizer: Optimizer = Adam(params=chain(alice.parameters(), bob.parameters()))
 
     # loop over episodes
-    for step in range(10000):
+    for step in range(1000):
         # get state from environment
         state = env.reset()
 
@@ -146,7 +146,7 @@ def main():
         pg_loss.backward()
         ac_optimizer.step()
 
-        if step % 1000 == 0:
+        if step % 200 == 0:
             print(q_alice.item(), q_bob.item())
             print(ac_alice, ac_bob)
             print('---------')
