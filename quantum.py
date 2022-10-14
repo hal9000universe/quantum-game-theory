@@ -12,15 +12,21 @@ def tens_pow(n: int, t: Tensor) -> Tensor:
 
 class QuantumSystem:
     _state: Tensor
+    _num_qubits: int
 
     def __init__(self, num_qubits: int):
         self._state = one_hot(tensor(0, dtype=int64), pow(2, num_qubits)).type(complex64)
+        self._num_qubits = num_qubits
 
     def measure(self) -> Tensor:
         probs: Tensor = self._state.abs().square()
         dist: Distribution = Multinomial(probs=probs)
         measurement: Tensor = dist.sample(1)
         return measurement
+
+    @property
+    def num_qubits(self) -> int:
+        return self._num_qubits
 
     @property
     def probs(self) -> Tensor:
@@ -34,6 +40,9 @@ class QuantumSystem:
     def state(self, value: Tensor):
         self._state = value
 
+    def __repr__(self) -> str:
+        return '{}'.format(self._state)
+
 
 class Operator:
     _mat: Tensor
@@ -41,9 +50,20 @@ class Operator:
     def __init__(self, mat: Tensor):
         self._mat = mat
 
+    def __matmul__(self, other: QuantumSystem) -> QuantumSystem:
+        qs = QuantumSystem(num_qubits=other.num_qubits)
+        qs.state = self.mat @ other.state
+        return qs
+
+    def __add__(self, other):
+        return Operator(mat=kron(self.mat, other.mat))
+
     @property
     def mat(self) -> Tensor:
         return self._mat
+
+    def __repr__(self) -> str:
+        return '{}'.format(self.mat)
 
 
 class I(Operator):
