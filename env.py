@@ -29,8 +29,12 @@ class Env:
         return self._state
 
     def operator(self, *params) -> Tensor:
-        # TODO: implement general operator (multi-player quantum games bottom left page 2)
         raise NotImplementedError
+
+    def general_operator(self, alpha: Tensor, beta: Tensor, gamma: Tensor, A: Tensor, B: Tensor) -> Tensor:
+        general_op = alpha.pow(A) * 1j * (beta.pow(A) * self._ops.sx.mat + beta.pow(B) * self._ops.sy.mat)
+        general_op += alpha.pow(B) * (gamma.pow(A) * self._ops.I.mat + 1j * gamma.pow(B) * self._ops.sz.mat)
+        return general_op
 
     def step(self, *args) -> List[Tensor]:
         assert len(args) == self._num_players
