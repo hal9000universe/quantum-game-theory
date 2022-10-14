@@ -4,8 +4,7 @@ from itertools import chain
 from typing import Optional, Tuple
 
 # nn & rl
-import torch.nn.init
-from torch import tensor, Tensor, cat, kron, full, real, zeros
+from torch import tensor, Tensor, cat, kron, full, real, zeros, manual_seed
 from torch import relu, sigmoid, exp, sin, cos, matrix_exp
 from torch import float32, complex64
 from torch.nn import Module, Linear
@@ -104,6 +103,7 @@ class ComplexNetwork(Module):
         Initializes weights using the kaiming-normal distribution and sets weights to zero.
         """
         if isinstance(m, Linear):
+            manual_seed(2000)  # ensures reproducibility
             kaiming_normal_(m.weight)
             m.bias.data.fill_(0.)
 
