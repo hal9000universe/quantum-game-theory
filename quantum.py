@@ -57,10 +57,28 @@ class I(Operator):
         return cls(dims=dims)
 
 
-class F(Operator):
+class PauliX(Operator):
+
     def __init__(self):
-        flip: Tensor = tensor([[]])
-        super(F, self).__init__(mat=flip)
+        pauli_x: Tensor = tensor([[0., 1.],
+                                  [1., 0.]], dtype=complex64)
+        super(PauliX, self).__init__(mat=pauli_x)
+
+
+class PauliY(Operator):
+
+    def __init__(self):
+        pauli_y: Tensor = tensor([[0., -1j],
+                                  [1j, 0.]], dtype=complex64)
+        super(PauliY, self).__init__(mat=pauli_y)
+
+
+class PauliZ(Operator):
+
+    def __init__(self):
+        pauli_z: Tensor = tensor([[1., 0.],
+                                  [0., -1.]], dtype=complex64)
+        super(PauliZ, self).__init__(mat=pauli_z)
 
 
 class H(Operator):
@@ -84,7 +102,8 @@ class CNOT(Operator):
 class J(Operator):
 
     def __init__(self, num_players: int = 2):
-        prep: Tensor = 1 / tensor(2.).sqrt() * (tens_pow(num_players, I().mat) + 1j * tens_pow(num_players, F().mat))
+        prep: Tensor = 1 / tensor(2.).sqrt() * (
+                    tens_pow(num_players, I().mat) + 1j * tens_pow(num_players, PauliX().mat))
         super(J, self).__init__(mat=prep)
 
     @classmethod
@@ -94,14 +113,18 @@ class J(Operator):
 
 class Ops:
     _I: I
-    _F: F
+    _sx: PauliX
+    _sy: PauliY
+    _sz: PauliZ
     _H: H
     _CNOT: CNOT
     _J: J
 
     def __init__(self):
         self._I = I()
-        self._F = F()
+        self._sx = PauliX()
+        self._sy = PauliY()
+        self._sz = PauliZ()
         self._H = H()
         self._CNOT = CNOT()
         self._J = J()
@@ -111,8 +134,16 @@ class Ops:
         return self._I
 
     @property
-    def F(self) -> F:
-        return self._F
+    def sx(self) -> PauliX:
+        return self._sx
+
+    @property
+    def sy(self) -> PauliY:
+        return self._sy
+
+    @property
+    def sz(self) -> PauliZ:
+        return self._sz
 
     @property
     def H(self) -> H:
