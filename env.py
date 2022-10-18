@@ -28,13 +28,21 @@ class Env:
         self._state = self._J @ self._state
         return self._state
 
-    def operator(self, *params) -> Tensor:
+    def operator(self, *params) -> Operator:
+        """
+        returns an operator specified by
+        """
         raise NotImplementedError
 
-    def general_operator(self, alpha: Tensor, beta: Tensor, gamma: Tensor, A: Tensor, B: Tensor) -> Tensor:
-        general_op = alpha.pow(A) * 1j * (beta.pow(A) * self._ops.sx.mat + beta.pow(B) * self._ops.sy.mat)
-        general_op += alpha.pow(B) * (gamma.pow(A) * self._ops.I.mat + 1j * gamma.pow(B) * self._ops.sz.mat)
-        return general_op
+    def general_local_operator(self, theta1: Tensor, theta2: Tensor, theta3: Tensor) -> Operator:
+        """
+        returns a general local unitary operator specified by theta1, theta2 & theta3.
+        """
+        rot1 = self._ops.RotZ.inject(theta1).mat
+        rot2 = self._ops.RotX.inject(theta2).mat
+        rot3 = self._ops.RotZ.inject(theta3).mat
+        op = rot3 @ rot2 @ rot1
+        return Operator(mat=op)
 
     def step(self, *args) -> List[Tensor]:
         assert len(args) == self._num_players

@@ -1,11 +1,12 @@
-from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64
+# nn & rl
+from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64, matrix_exp
 from torch.distributions import Multinomial, Distribution
 from torch.nn.functional import one_hot
 
 
 def tens_pow(n: int, t: Tensor) -> Tensor:
     out: Tensor = t
-    for i in range(n):
+    for i in range(1, n):
         out = kron(out, t)
     return out
 
@@ -101,6 +102,39 @@ class PauliZ(Operator):
         super(PauliZ, self).__init__(mat=pauli_z)
 
 
+class RotX(Operator):
+
+    def __init__(self, rotx: Tensor = PauliX().mat):
+        super(RotX, self).__init__(mat=rotx)
+
+    @classmethod
+    def inject(cls, theta: Tensor) -> Operator:
+        rotx = matrix_exp(1j / 2 * theta * PauliX().mat)
+        return cls(rotx=rotx)
+
+
+class RotY(Operator):
+
+    def __init__(self, rotx: Tensor = PauliY().mat):
+        super(RotY, self).__init__(mat=rotx)
+
+    @classmethod
+    def inject(cls, theta: Tensor) -> Operator:
+        rotx = matrix_exp(1j / 2 * theta * PauliY().mat)
+        return cls(rotx=rotx)
+
+
+class RotZ(Operator):
+
+    def __init__(self, rotx: Tensor = PauliZ().mat):
+        super(RotZ, self).__init__(mat=rotx)
+
+    @classmethod
+    def inject(cls, theta: Tensor) -> Operator:
+        rotx = matrix_exp(1j / 2 * theta * PauliZ().mat)
+        return cls(rotx=rotx)
+
+
 class H(Operator):
 
     def __init__(self):
@@ -139,6 +173,9 @@ class Ops:
     _H: H
     _CNOT: CNOT
     _J: J
+    _RotX: RotX
+    _RotY: RotY
+    _RotZ: RotZ
 
     def __init__(self):
         self._I = I()
@@ -148,6 +185,9 @@ class Ops:
         self._H = H()
         self._CNOT = CNOT()
         self._J = J()
+        self._RotX = RotX()
+        self._RotY = RotY()
+        self._RotZ = RotZ()
 
     @property
     def I(self) -> I:
@@ -176,6 +216,18 @@ class Ops:
     @property
     def J(self) -> J:
         return self._J
+
+    @property
+    def RotX(self) -> RotX:
+        return self._RotX
+
+    @property
+    def RotY(self) -> RotY:
+        return self._RotY
+
+    @property
+    def RotZ(self) -> RotZ:
+        return self._RotZ
 
 
 if __name__ == '__main__':

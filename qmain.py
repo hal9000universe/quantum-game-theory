@@ -1,7 +1,8 @@
 # py
 from math import pi
 from itertools import chain
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable, Dict
+from random import uniform
 
 # nn & rl
 from torch import tensor, Tensor, cat, kron, full, real, zeros, manual_seed
@@ -10,9 +11,10 @@ from torch import float32, complex64
 from torch.nn import Module, Linear
 from torch.nn.init import kaiming_normal_
 from torch.optim import Adam, Optimizer
+from bayes_opt import BayesianOptimization, UtilityFunction
 
 # lib
-from quantum import QuantumSystem, Ops, Operator, J
+from quantum import QuantumSystem, Ops, Operator
 
 
 def rotation_operator(params: Tensor) -> Operator:
@@ -113,7 +115,7 @@ class ComplexNetwork(Module):
         Initializes weights using the kaiming-normal distribution and sets weights to zero.
         """
         if isinstance(m, Linear):
-            manual_seed(2000)  # ensures reproducibility
+            # manual_seed(2000)  # ensures reproducibility
             kaiming_normal_(m.weight)
             m.bias.data.fill_(0.)
 
@@ -132,10 +134,11 @@ def main():
     env: Env = Env()
     alice: Module = ComplexNetwork()
     bob: Module = ComplexNetwork()
-    ac_optimizer: Optimizer = Adam(params=chain(alice.parameters(), bob.parameters()))
+    al_op = Adam(params=alice.parameters())
+    bo_op = Adam(params=bob.parameters())
 
     # loop over episodes
-    for step in range(1000):
+    for step in range(10000):
         # get state from environment
         state = env.reset()
 
@@ -147,14 +150,30 @@ def main():
         q_alice, q_bob = env.step(ac_alice, ac_bob)
 
         # define loss
-        alice_loss = -q_alice
-        bob_loss = -q_bob
-        pg_loss = alice_loss + bob_loss
+        alice_loss: Tensor = -q_alice
 
-        # update agents
-        ac_optimizer.zero_grad()
-        pg_loss.backward()
-        ac_optimizer.step()
+        # optimize alice
+        al_op.zero_grad()
+        alice_loss.backward()
+        al_op.step()
+
+        # get state from environment
+        state = env.reset()
+
+        # compute actions
+        ac_bob = bob(state)
+        ac_alice = alice(state)
+
+        # compute q-values
+        q_alice, q_bob = env.step(ac_alice, ac_bob)
+
+        # define loss
+        bob_loss: Tensor = -q_bob
+
+        # optimize bob
+        bo_op.zero_grad()
+        bob_loss.backward()
+        bo_op.step()
 
         if step % 200 == 0:
             print(q_alice.item(), q_bob.item())
