@@ -1,0 +1,5 @@
+# [qmain] test random inputs - check ... works astonishingly well
+# TODO: [env] implement two more games and run the algorithm on them
+# TODO: [penny] connect algorithm to the circuit
+# TODO: [env] integrate pennylane into env framework
+# [penny] understand measurements - check

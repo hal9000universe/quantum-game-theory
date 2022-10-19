@@ -1,17 +1,21 @@
 # py
 from math import pi
 from itertools import chain
-from typing import Optional, Tuple, Callable, Dict
+from typing import Optional, Tuple, Callable, Dict, List
 from random import uniform
 
 # nn & rl
-from torch import tensor, Tensor, cat, kron, full, real, zeros, manual_seed
+from torch import tensor, Tensor, cat, kron, full, real, zeros, manual_seed, allclose
 from torch import relu, sigmoid, exp, sin, cos, matrix_exp
 from torch import float32, complex64
 from torch.nn import Module, Linear
 from torch.nn.init import kaiming_normal_
 from torch.optim import Adam, Optimizer
+from torch.distributions import Uniform, Distribution
 from bayes_opt import BayesianOptimization, UtilityFunction
+
+# quantum
+from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
 from quantum import QuantumSystem, Ops, Operator
@@ -35,11 +39,27 @@ def rotation_operator(params: Tensor) -> Operator:
     return Operator(mat=rot)
 
 
+def create_circuit() -> Callable:
+    dev: Device = device('lightning.qubit', wires=2)
+    all_wires: List[int] = [0, 1]
+
+    @qnode(device=dev, interface='torch')
+    def circuit(u1: Tensor, u2: Tensor) -> Tensor:
+        QubitUnitary(Ops().J.inject(num_players=2).mat, wires=all_wires)
+        QubitUnitary(u1, wires=0)
+        QubitUnitary(u2, wires=1)
+        QubitUnitary(Ops().J.inject(num_players=2).mat.adjoint(), wires=all_wires)
+        return probs(wires=all_wires)
+
+    return circuit
+
+
 class Env:
     _state: Optional[QuantumSystem]
     _J: Operator
     _J_adj: Operator
     _rewards = Tensor
+    _uniform: Distribution
 
     def __init__(self):
         """
@@ -59,6 +79,8 @@ class Env:
         self._J_adj = Operator(mat=self._J.mat.adjoint())
         # reward distribution
         self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
+        # create uniform input distribution
+        self._uniform = Uniform(-0.25, 0.25)
 
     @property
     def _ground_state(self) -> QuantumSystem:
@@ -67,24 +89,40 @@ class Env:
     def reset(self) -> Tensor:
         """prepares and returns the initial state according to Eisert et al. 2020."""
         self._state = self._J @ self._ground_state
-        return self._state.state
+        rand_inp = self._uniform.sample((4,)).type(complex64)
+        return rand_inp
 
     def step(self, a1: Tensor, a2: Tensor) -> Tuple[Tensor, Tensor]:
         """
         calculates and returns the q-values for alice and bob given their respective actions.
         """
         # create rotation operators given by a1 and a2
-        rot1, rot2 = rotation_operator(a1), rotation_operator(a2)
+        rot1: Operator = rotation_operator(a1)
+        rot2: Operator = rotation_operator(a2)
         # create operator
-        op = rot1 + rot2
+        op: Operator = rot1 + rot2
         # apply rotation operators to the quantum system
         self._state = op @ self._state
         # apply adjoint of J
         self._state = self._J_adj @ self._state
-        # calculate expected reward respectively
+        # calculate q-values
         q1: Tensor = (self._rewards[:, 0] * self._state.probs).sum()
         q2: Tensor = (self._rewards[:, 1] * self._state.probs).sum()
-        # return rewards
+        # return q-values
+        return q1, q2
+
+    def quantum_step(self, a1: Tensor, a2: Tensor) -> Tuple[Tensor, Tensor]:
+        # create circuit
+        circuit: Callable = create_circuit()
+        # create rotation operators given by a1 and a2
+        u1: Tensor = rotation_operator(a1).mat
+        u2: Tensor = rotation_operator(a2).mat
+        # run quantum circuit
+        probabilities: Tensor = circuit(u1, u2)
+        # calculate q-values
+        q1: Tensor = (self._rewards[:, 0] * probabilities).sum()
+        q2: Tensor = (self._rewards[:, 1] * probabilities).sum()
+        # return q-values
         return q1, q2
 
 
@@ -138,7 +176,7 @@ def main():
     bo_op = Adam(params=bob.parameters())
 
     # loop over episodes
-    for step in range(10000):
+    for step in range(1000):
         # get state from environment
         state = env.reset()
 
@@ -176,6 +214,71 @@ def main():
         bo_op.step()
 
         if step % 200 == 0:
+            pass
+            # print('step: {}'.format(step))
+            # print(q_alice.item(), q_bob.item())
+            # print(ac_alice, ac_bob)
+            # print('---------')
+
+    state = env.reset()
+    ac_al = alice(state)
+    ac_bo = bob(state)
+    reward_a, reward_b = env.step(ac_al, ac_bo)
+    print('actions after training: ')
+    print('alice: {}'.format(ac_al))
+    print('bob: {}'.format(ac_bo))
+    print('reward after training: {} {}'.format(reward_a.item(), reward_b.item()))
+    return ac_al, ac_bo
+
+
+def qmain():
+    # initialize base classes
+    env: Env = Env()
+    alice: Module = ComplexNetwork()
+    bob: Module = ComplexNetwork()
+    al_op = Adam(params=alice.parameters())
+    bo_op = Adam(params=bob.parameters())
+
+    # loop over episodes
+    for step in range(3000):
+        # get state from environment
+        state = env.reset()
+
+        # compute actions
+        ac_alice = alice(state)
+        ac_bob = bob(state)
+
+        # compute q-values
+        q_alice, q_bob = env.quantum_step(ac_alice, ac_bob)
+
+        # define loss
+        alice_loss: Tensor = -q_alice
+
+        # optimize alice
+        al_op.zero_grad()
+        alice_loss.backward()
+        al_op.step()
+
+        # get state from environment
+        state = env.reset()
+
+        # compute actions
+        ac_bob = bob(state)
+        ac_alice = alice(state)
+
+        # compute q-values
+        q_alice, q_bob = env.quantum_step(ac_alice, ac_bob)
+
+        # define loss
+        bob_loss: Tensor = -q_bob
+
+        # optimize bob
+        bo_op.zero_grad()
+        bob_loss.backward()
+        bo_op.step()
+
+        if step % 200 == 0:
+            print('step: {}'.format(step))
             print(q_alice.item(), q_bob.item())
             print(ac_alice, ac_bob)
             print('---------')
@@ -188,7 +291,22 @@ def main():
     print('alice: {}'.format(ac_al))
     print('bob: {}'.format(ac_bo))
     print('reward after training: {} {}'.format(reward_a.item(), reward_b.item()))
+    return ac_al, ac_bo
+
+
+def check(final_params: Tensor) -> bool:
+    learned: bool = allclose(final_params, tensor([0., pi / 2]),
+                             rtol=0.1,
+                             atol=0.1)
+    return learned
 
 
 if __name__ == '__main__':
-    main()
+    nums: int = 0
+    times: int = 100
+    for time in range(times):
+        final_params1, final_params2 = main()
+        if check(final_params1) and check(final_params2):
+            nums += 1
+    success_rate: float = nums / times
+    print('success rate: {}'.format(success_rate))
