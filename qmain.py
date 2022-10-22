@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Callable, Dict, List
 from random import uniform
 
 # nn & rl
-from torch import tensor, Tensor, cat, kron, full, real, zeros, manual_seed, allclose
+from torch import tensor, Tensor, cat, kron, full, real, zeros, manual_seed, allclose, ones, complex64
 from torch import relu, sigmoid, exp, sin, cos, matrix_exp
 from torch import float32, complex64
 from torch.nn import Module, Linear
@@ -15,7 +15,7 @@ from torch.distributions import Uniform, Distribution
 from bayes_opt import BayesianOptimization, UtilityFunction
 
 # quantum
-from pennylane import qnode, QubitUnitary, probs, device, Device
+from pennylane import qnode, QubitUnitary, probs, device, Device, PauliZ, expval
 
 # lib
 from quantum import QuantumSystem, Ops, Operator
@@ -40,14 +40,13 @@ def rotation_operator(params: Tensor) -> Operator:
 
 
 def create_circuit() -> Callable:
-    dev: Device = device('lightning.qubit', wires=2)
+    dev: Device = device('default.qubit', wires=2)
     all_wires: List[int] = [0, 1]
 
     @qnode(device=dev, interface='torch')
-    def circuit(u1: Tensor, u2: Tensor) -> Tensor:
+    def circuit(U: Tensor) -> Tensor:
         QubitUnitary(Ops().J.inject(num_players=2).mat, wires=all_wires)
-        QubitUnitary(u1, wires=0)
-        QubitUnitary(u2, wires=1)
+        QubitUnitary(U, wires=all_wires)
         QubitUnitary(Ops().J.inject(num_players=2).mat.adjoint(), wires=all_wires)
         return probs(wires=all_wires)
 
@@ -86,25 +85,32 @@ class Env:
     def _ground_state(self) -> QuantumSystem:
         return QuantumSystem(num_qubits=2)
 
-    def reset(self) -> Tensor:
-        """prepares and returns the initial state according to Eisert et al. 2020."""
-        self._state = self._J @ self._ground_state
-        rand_inp = self._uniform.sample((4,)).type(complex64)
-        return rand_inp
+    def reset(self, fix_inp: bool = False) -> Tensor:
+        """returns a random input"""
+        if fix_inp:
+            return 0.1 * ones((4,)).type(complex64)
+        else:
+            rand_inp = self._uniform.sample((4,)).type(complex64)
+            return rand_inp
 
     def step(self, a1: Tensor, a2: Tensor) -> Tuple[Tensor, Tensor]:
         """
         calculates and returns the q-values for alice and bob given their respective actions.
         """
+        # prepare initial state
+        self._state = self._J @ self._ground_state
         # create rotation operators given by a1 and a2
         rot1: Operator = rotation_operator(a1)
         rot2: Operator = rotation_operator(a2)
-        # create operator
+        # apply tensor product to create an operator which acts on the 2-qubit system
         op: Operator = rot1 + rot2
         # apply rotation operators to the quantum system
         self._state = op @ self._state
         # apply adjoint of J
         self._state = self._J_adj @ self._state
+
+        print(self._state.probs)
+
         # calculate q-values
         q1: Tensor = (self._rewards[:, 0] * self._state.probs).sum()
         q2: Tensor = (self._rewards[:, 1] * self._state.probs).sum()
@@ -115,10 +121,14 @@ class Env:
         # create circuit
         circuit: Callable = create_circuit()
         # create rotation operators given by a1 and a2
-        u1: Tensor = rotation_operator(a1).mat
-        u2: Tensor = rotation_operator(a2).mat
+        u1: Operator = rotation_operator(a1)
+        u2: Operator = rotation_operator(a2)
+        U: Tensor = (u1 + u2).mat
         # run quantum circuit
-        probabilities: Tensor = circuit(u1, u2)
+        probabilities: Tensor = circuit(U)
+
+        print(probabilities)
+
         # calculate q-values
         q1: Tensor = (self._rewards[:, 0] * probabilities).sum()
         q2: Tensor = (self._rewards[:, 1] * probabilities).sum()
@@ -175,10 +185,14 @@ def main():
     al_op = Adam(params=alice.parameters())
     bo_op = Adam(params=bob.parameters())
 
+    episodes: int = 1000
+    fix_inp: bool = False
+    fix_inp_time: int = int(episodes * 0.6)
+
     # loop over episodes
     for step in range(1000):
         # get state from environment
-        state = env.reset()
+        state = env.reset(fix_inp=fix_inp)
 
         # compute actions
         ac_alice = alice(state)
@@ -196,7 +210,7 @@ def main():
         al_op.step()
 
         # get state from environment
-        state = env.reset()
+        state = env.reset(fix_inp=fix_inp)
 
         # compute actions
         ac_bob = bob(state)
@@ -220,10 +234,14 @@ def main():
             # print(ac_alice, ac_bob)
             # print('---------')
 
+        if step == fix_inp_time:
+            fix_inp = True
+
     state = env.reset()
     ac_al = alice(state)
     ac_bo = bob(state)
     reward_a, reward_b = env.step(ac_al, ac_bo)
+    print('-----')
     print('actions after training: ')
     print('alice: {}'.format(ac_al))
     print('bob: {}'.format(ac_bo))
@@ -239,10 +257,14 @@ def qmain():
     al_op = Adam(params=alice.parameters())
     bo_op = Adam(params=bob.parameters())
 
+    episodes: int = 3000
+    fix_inp: bool = False
+    fix_inp_time: int = int(episodes * 0.6)
+
     # loop over episodes
-    for step in range(3000):
+    for step in range(episodes):
         # get state from environment
-        state = env.reset()
+        state = env.reset(fix_inp=fix_inp)
 
         # compute actions
         ac_alice = alice(state)
@@ -260,7 +282,7 @@ def qmain():
         al_op.step()
 
         # get state from environment
-        state = env.reset()
+        state = env.reset(fix_inp=fix_inp)
 
         # compute actions
         ac_bob = bob(state)
@@ -283,10 +305,14 @@ def qmain():
             print(ac_alice, ac_bob)
             print('---------')
 
+        if step == fix_inp_time:
+            fix_inp = True
+
     state = env.reset()
     ac_al = alice(state)
     ac_bo = bob(state)
     reward_a, reward_b = env.step(ac_al, ac_bo)
+    print('-----')
     print('actions after training: ')
     print('alice: {}'.format(ac_al))
     print('bob: {}'.format(ac_bo))
@@ -301,12 +327,16 @@ def check(final_params: Tensor) -> bool:
     return learned
 
 
-if __name__ == '__main__':
+def sim_success_evaluation():
     nums: int = 0
-    times: int = 100
+    times: int = 20
     for time in range(times):
         final_params1, final_params2 = main()
         if check(final_params1) and check(final_params2):
             nums += 1
     success_rate: float = nums / times
     print('success rate: {}'.format(success_rate))
+
+
+if __name__ == '__main__':
+    sim_success_evaluation()
