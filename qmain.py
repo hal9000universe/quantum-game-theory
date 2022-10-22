@@ -43,11 +43,16 @@ def create_circuit() -> Callable:
     dev: Device = device('default.qubit', wires=2)
     all_wires: List[int] = [0, 1]
 
+    gamma: float = pi / 2
+    D: Tensor = tensor([[0., 1.],
+                        [-1., 0.]], dtype=complex64)
+    J = matrix_exp(-1j * gamma * kron(D, D) / 2)
+
     @qnode(device=dev, interface='torch')
     def circuit(U: Tensor) -> Tensor:
-        QubitUnitary(Ops().J.inject(num_players=2).mat, wires=all_wires)
+        QubitUnitary(J, wires=all_wires)
         QubitUnitary(U, wires=all_wires)
-        QubitUnitary(Ops().J.inject(num_players=2).mat.adjoint(), wires=all_wires)
+        QubitUnitary(J.adjoint(), wires=all_wires)
         return probs(wires=all_wires)
 
     return circuit
@@ -56,7 +61,6 @@ def create_circuit() -> Callable:
 class Env:
     _state: Optional[QuantumSystem]
     _J: Operator
-    _J_adj: Operator
     _rewards = Tensor
     _uniform: Distribution
 
@@ -75,7 +79,6 @@ class Env:
                             [-1., 0.]], dtype=complex64)
         mat = matrix_exp(-1j * gamma * kron(D, D) / 2)
         self._J = Operator(mat=mat)
-        self._J_adj = Operator(mat=self._J.mat.adjoint())
         # reward distribution
         self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
         # create uniform input distribution
@@ -107,10 +110,7 @@ class Env:
         # apply rotation operators to the quantum system
         self._state = op @ self._state
         # apply adjoint of J
-        self._state = self._J_adj @ self._state
-
-        print(self._state.probs)
-
+        self._state = self._J.adjoint @ self._state
         # calculate q-values
         q1: Tensor = (self._rewards[:, 0] * self._state.probs).sum()
         q2: Tensor = (self._rewards[:, 1] * self._state.probs).sum()
@@ -126,9 +126,6 @@ class Env:
         U: Tensor = (u1 + u2).mat
         # run quantum circuit
         probabilities: Tensor = circuit(U)
-
-        print(probabilities)
-
         # calculate q-values
         q1: Tensor = (self._rewards[:, 0] * probabilities).sum()
         q2: Tensor = (self._rewards[:, 1] * probabilities).sum()
@@ -227,12 +224,11 @@ def main():
         bob_loss.backward()
         bo_op.step()
 
-        if step % 200 == 0:
-            pass
-            # print('step: {}'.format(step))
-            # print(q_alice.item(), q_bob.item())
-            # print(ac_alice, ac_bob)
-            # print('---------')
+        if (step + 1) % 20000 == 0:
+            print('step: {}'.format(step))
+            print(q_alice.item(), q_bob.item())
+            print(ac_alice, ac_bob)
+            print('---------')
 
         if step == fix_inp_time:
             fix_inp = True
@@ -257,7 +253,7 @@ def qmain():
     al_op = Adam(params=alice.parameters())
     bo_op = Adam(params=bob.parameters())
 
-    episodes: int = 3000
+    episodes: int = 1000
     fix_inp: bool = False
     fix_inp_time: int = int(episodes * 0.6)
 
@@ -299,7 +295,7 @@ def qmain():
         bob_loss.backward()
         bo_op.step()
 
-        if step % 200 == 0:
+        if (step + 1) % 200 == 0:
             print('step: {}'.format(step))
             print(q_alice.item(), q_bob.item())
             print(ac_alice, ac_bob)
@@ -333,10 +329,23 @@ def sim_success_evaluation():
     for time in range(times):
         final_params1, final_params2 = main()
         if check(final_params1) and check(final_params2):
+            print('training successful ...')
+            nums += 1
+    success_rate: float = nums / times
+    print('success rate: {}'.format(success_rate))
+
+
+def quantum_success_simulation():
+    nums: int = 0
+    times: int = 10
+    for time in range(times):
+        final_params1, final_params2 = qmain()
+        if check(final_params1) and check(final_params2):
+            print('training successful ...')
             nums += 1
     success_rate: float = nums / times
     print('success rate: {}'.format(success_rate))
 
 
 if __name__ == '__main__':
-    sim_success_evaluation()
+    qmain()
