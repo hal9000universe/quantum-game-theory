@@ -3,7 +3,6 @@
 This repository investigates reinforcement learning algorithms to solve quantum games.
 
 TODO:
-- design quantum framework
-- implement general quantum games
-- apply algorithm to more quantum games
-- connect to pennylane.ai
+- align quantum framework and pennylane semantically
+- investigate issues associated with using pennylane environment (PRIORITY) 
+- investigate learning issues in multi-player games
