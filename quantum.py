@@ -70,7 +70,7 @@ class Operator:
 class I(Operator):
 
     def __init__(self, dims: int = 2):
-        iden: Tensor = eye(dims)
+        iden: Tensor = eye(dims).type(complex64)
         super(I, self).__init__(mat=iden)
 
     @classmethod
@@ -109,7 +109,8 @@ class RotX(Operator):
 
     @classmethod
     def inject(cls, theta: Tensor) -> Operator:
-        rotx = matrix_exp(1j / 2 * theta * PauliX().mat)
+        exponent: Tensor = 1j / 2 * theta * PauliX().mat
+        rotx = matrix_exp(exponent)
         return cls(rotx=rotx)
 
 
@@ -120,8 +121,9 @@ class RotY(Operator):
 
     @classmethod
     def inject(cls, theta: Tensor) -> Operator:
-        rotx = matrix_exp(1j / 2 * theta * PauliY().mat)
-        return cls(rotx=rotx)
+        exponent: Tensor = 1j / 2 * theta * PauliY().mat
+        roty = matrix_exp(exponent)
+        return cls(rotx=roty)
 
 
 class RotZ(Operator):
@@ -130,9 +132,10 @@ class RotZ(Operator):
         super(RotZ, self).__init__(mat=rotx)
 
     @classmethod
-    def inject(cls, theta: Tensor) -> Operator:
-        rotx = matrix_exp(1j / 2 * theta * PauliZ().mat)
-        return cls(rotx=rotx)
+    def inj(cls, theta: Tensor) -> Operator:
+        exponent: Tensor = 1j / 2 * theta * PauliZ().mat
+        rotz = matrix_exp(exponent)
+        return cls(rotx=rotz)
 
 
 class H(Operator):
@@ -231,4 +234,8 @@ class Ops:
 
 
 if __name__ == '__main__':
-    sys = QuantumSystem(num_qubits=2)
+    sys = QuantumSystem(num_qubits=3)
+    O = Ops()
+    sys.state = (O.sx + O.I + O.I) @ sys
+    print(sys.state)
+
