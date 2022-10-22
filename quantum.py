@@ -63,6 +63,10 @@ class Operator:
     def mat(self) -> Tensor:
         return self._mat
 
+    @property
+    def adjoint(self):
+        return Operator(self.mat.adjoint())
+
     def __repr__(self) -> str:
         return '{}'.format(self.mat)
 
