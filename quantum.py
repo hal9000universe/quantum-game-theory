@@ -235,11 +235,3 @@ class Ops:
     @property
     def RotZ(self) -> RotZ:
         return self._RotZ
-
-
-if __name__ == '__main__':
-    sys = QuantumSystem(num_qubits=3)
-    O = Ops()
-    sys.state = (O.sx + O.I + O.I) @ sys
-    print(sys.state)
-

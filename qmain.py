@@ -157,7 +157,7 @@ class ComplexNetwork(Module):
     @staticmethod
     def _initialize(m):
         """
-        Initializes weights using the kaiming-normal distribution and sets weights to zero.
+        Initializes weights using the kaiming-normal distribution and sets biases to zero.
         """
         if isinstance(m, Linear):
             # manual_seed(2000)  # ensures reproducibility
