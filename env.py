@@ -1,13 +1,89 @@
 # py
-from typing import Optional, List
-from math import sqrt
+from typing import Optional, List, Tuple
+from math import sqrt, pi
 
 # nn & rl
-from torch import Tensor, tensor, kron, complex64, ones
+from torch import Tensor, tensor, kron, complex64, ones, linspace
 from torch.distributions import Distribution, Uniform
 
 # lib
 from quantum import Ops, Operator, QuantumSystem
+
+
+class ActionSpace:
+    _ranges: List[Tuple[float, float]]
+    _num_steps: int
+    _num_params: int
+    _ops: Ops
+
+    def __init__(self, ranges: List[Tuple[float, float]]):
+        self._ranges = ranges
+        self._num_steps = 30
+        self._num_params = len(ranges)
+        self._ops = Ops()
+
+    @property
+    def num_params(self) -> int:
+        return self._num_params
+
+    @property
+    def num_steps(self) -> int:
+        return self._num_steps
+
+    @property
+    def iterator(self) -> List[Tensor]:
+        itr: List[Tensor] = []
+        for rng in self._ranges:
+            space: Tensor = linspace(rng[0], rng[1], steps=self._num_steps)
+            itr.append(space)
+        return itr
+
+    def operator(self, params: Tensor) -> Tensor:
+        raise NotImplementedError
+
+
+class GeneralActionSpace(ActionSpace):
+
+    def __init__(self):
+        # euler angle ranges: [-pi, pi], [0, pi], [-pi, pi]
+        ranges: List[Tuple[float, float]] = [(-pi, pi), (0., pi), (-pi, pi)]
+        super(GeneralActionSpace, self).__init__(ranges=ranges)
+
+    def operator(self, params: Tensor) -> Tensor:
+        """
+        computes and returns a complex rotation matrix given by the Euler angles in params.
+        """
+        theta1, theta2, theta3 = params
+        rot1: Tensor = self._ops.RotZ.inj(theta1).mat
+        rot2: Tensor = self._ops.RotX.inject(theta2).mat
+        rot3: Tensor = self._ops.RotZ.inj(theta3).mat
+        op: Tensor = rot3 @ rot2 @ rot1
+        return op
+
+
+class RestrictedActionSpace(ActionSpace):
+
+    def __init__(self):
+        # angle ranges given in Quantum Games and Quantum Strategies by Eisert et al.
+        ranges: List[Tuple[float, float]] = [(0., pi), (0., pi / 2)]
+        super(RestrictedActionSpace, self).__init__(ranges=ranges)
+
+    def operator(self, params: Tensor) -> Tensor:
+        """
+        computes and returns a complex rotation matrix given by the angles in params.
+        """
+        theta, phi = params
+        # calculate entries
+        a: Tensor = exp(1j * phi) * cos(theta / 2)
+        b: Tensor = sin(theta / 2)
+        c: Tensor = -b
+        d: Tensor = exp(-1j * phi) * cos(theta / 2)
+        # construct the rows of the rotation matrix
+        r1: Tensor = cat((a.view(1), b.view(1)))
+        r2: Tensor = cat((c.view(1), d.view(1)))
+        # build and return the rotation matrix
+        rot: Tensor = cat((r1, r2)).view(2, 2)
+        return rot
 
 
 class Env:
@@ -77,23 +153,3 @@ class Env:
             q_i = (self._reward_distribution[:, i] * probs).sum()
             qs.append(q_i)
         return qs
-
-
-class QuantumSuperiorityGame(Env):
-
-    def __init__(self):
-        num_players: int = 3
-        reward_distribution: Tensor = tensor([[0., 0., 0.],  # 1
-                                              [-9, -9., 1.],  # 4
-                                              [-9., 1., -9.],  # 3
-                                              [1., 9., 9.],  # 5
-                                              [1., -9., -9.],  # 2
-                                              [9., 1., 9.],  # 6
-                                              [9., 9., 1.],  # 7
-                                              [2., 2., 2.]  # 8
-                                              ])
-        super(QuantumSuperiorityGame, self).__init__(num_players=num_players,
-                                                     reward_distribution=reward_distribution)
-
-    def _operator(self, *params) -> Operator:
-        return self._general_local_operator(*params)
