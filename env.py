@@ -53,12 +53,7 @@ class GeneralActionSpace(ActionSpace):
         """
         computes and returns a complex rotation matrix given by the Euler angles in params.
         """
-        theta1, theta2, theta3 = params
-        rot1: Tensor = self._ops.RotZ.inj(theta1).mat
-        rot2: Tensor = self._ops.RotX.inject(theta2).mat
-        rot3: Tensor = self._ops.RotZ.inj(theta3).mat
-        op: Tensor = rot3 @ rot2 @ rot1
-        return op
+        return self._ops.U.inj(*params).mat
 
 
 class RestrictedActionSpace(ActionSpace):

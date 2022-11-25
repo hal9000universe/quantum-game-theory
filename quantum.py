@@ -1,5 +1,5 @@
 # nn & rl
-from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64, matrix_exp
+from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64, matrix_exp, exp, sin, cos
 from torch.distributions import Multinomial, Distribution
 from torch.nn.functional import one_hot
 
@@ -172,6 +172,27 @@ class J(Operator):
         return cls(num_players=num_players)
 
 
+class U(Operator):
+
+    def __init__(self):
+        mat: Tensor = eye(2).type(complex64)
+        super(U, self).__init__(mat=mat)
+
+    @classmethod
+    def inj(cls, theta: Tensor, phi: Tensor, psi: Tensor) -> Operator:
+        a: Tensor = cos(theta / 2)
+        b: Tensor = sin(theta / 2)
+        c: Tensor = -exp(1j * psi)
+        d: Tensor = exp(1j * phi)
+        e: Tensor = exp(1j * (phi + psi))
+        # construct the rows of the rotation matrix
+        r1: Tensor = cat((a.view(1), (b * c).view(1)))
+        r2: Tensor = cat(((b * d).view(1), (a * e).view(1)))
+        # build and return the rotation matrix
+        rot: Tensor = cat((r1, r2)).view(2, 2)
+        return Operator(mat=rot)
+
+
 class Ops:
     _I: I
     _sx: PauliX
@@ -183,6 +204,7 @@ class Ops:
     _RotX: RotX
     _RotY: RotY
     _RotZ: RotZ
+    _U: U
 
     def __init__(self):
         self._I = I()
@@ -195,6 +217,7 @@ class Ops:
         self._RotX = RotX()
         self._RotY = RotY()
         self._RotZ = RotZ()
+        self._U = U()
 
     @property
     def I(self) -> I:
@@ -235,3 +258,7 @@ class Ops:
     @property
     def RotZ(self) -> RotZ:
         return self._RotZ
+
+    @property
+    def U(self) -> U:
+        return self._U
