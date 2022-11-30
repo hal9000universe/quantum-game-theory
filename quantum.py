@@ -1,5 +1,5 @@
 # nn & rl
-from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64, matrix_exp, exp, sin, cos
+from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64, matrix_exp, exp, sin, cos, cat
 from torch.distributions import Multinomial, Distribution
 from torch.nn.functional import one_hot
 

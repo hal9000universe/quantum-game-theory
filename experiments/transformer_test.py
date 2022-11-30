@@ -3,7 +3,7 @@ from math import pi
 from typing import Optional, Tuple, Callable, List
 
 # nn & rl
-from torch import tensor, Tensor, cat, kron, real, ones, complex64, float32, allclose
+from torch import tensor, Tensor, cat, kron, real, ones, complex64, float32, allclose, eye
 from torch import relu, sigmoid, exp, sin, cos, matrix_exp
 from torch.nn import Module, Linear
 from torch.nn.init import kaiming_normal_
@@ -15,6 +15,7 @@ from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
 from quantum import QuantumSystem, Operator
+from transformer import Transformer
 
 
 def rotation_operator(params: Tensor) -> Operator:
@@ -33,25 +34,6 @@ def rotation_operator(params: Tensor) -> Operator:
     # build and return the rotation matrix
     rot: Tensor = cat((r1, r2)).view(2, 2)
     return Operator(mat=rot)
-
-
-def create_circuit() -> Callable:
-    dev: Device = device('default.qubit', wires=2)
-    all_wires: List[int] = [0, 1]
-
-    gamma: float = pi / 2
-    D: Tensor = tensor([[0., 1.],
-                        [-1., 0.]], dtype=complex64)
-    J = matrix_exp(-1j * gamma * kron(D, D) / 2)
-
-    @qnode(device=dev, interface='torch')
-    def circuit(U: Tensor) -> Tensor:
-        QubitUnitary(J, wires=all_wires)
-        QubitUnitary(U, wires=all_wires)
-        QubitUnitary(J.adjoint(), wires=all_wires)
-        return probs(wires=all_wires)
-
-    return circuit
 
 
 class Env:
@@ -79,6 +61,11 @@ class Env:
         self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
         # create uniform input distribution
         self._uniform = Uniform(-0.25, 0.25)
+        self._observation = (self._J @ self._ground_state).state
+
+    @property
+    def reward_distribution(self) -> Tensor:
+        return self._rewards
 
     @property
     def _ground_state(self) -> QuantumSystem:
@@ -87,10 +74,10 @@ class Env:
     def reset(self, fix_inp: bool = False) -> Tensor:
         """returns a random input"""
         if fix_inp:
-            return 0.1 * ones((4,)).type(complex64)
+            return self._observation
         else:
             rand_inp = self._uniform.sample((4,)).type(complex64)
-            return rand_inp
+            return self._observation + rand_inp
 
     def step(self, a1: Tensor, a2: Tensor) -> Tuple[Tensor, Tensor]:
         """
@@ -113,72 +100,17 @@ class Env:
         # return q-values
         return q1, q2
 
-    def quantum_step(self, a1: Tensor, a2: Tensor) -> Tuple[Tensor, Tensor]:
-        # create circuit
-        circuit: Callable = create_circuit()
-        # create rotation operators given by a1 and a2
-        u1: Operator = rotation_operator(a1)
-        u2: Operator = rotation_operator(a2)
-        U: Tensor = (u1 + u2).mat
-        # run quantum circuit
-        probabilities: Tensor = circuit(U)
-        # calculate q-values
-        q1: Tensor = (self._rewards[:, 0] * probabilities).sum()
-        q2: Tensor = (self._rewards[:, 1] * probabilities).sum()
-        # return q-values
-        return q1, q2
-
-
-class ComplexNetwork(Module):
-    _lin1: Linear
-    _lin2: Linear
-    _lin3: Linear
-    _lin4: Linear
-    _scaling: Tensor
-
-    def __init__(self):
-        super(ComplexNetwork, self).__init__()
-        """
-        initializes ComplexNetwork class.
-         ComplexNetwork implements a feed-forward neural network which is capable of handling 
-         4-dimensional complex inputs. 
-        """
-        self._lin1 = Linear(4, 128, dtype=complex64)
-        self._lin2 = Linear(128, 128, dtype=float32)
-        self._lin3 = Linear(128, 128, dtype=float32)
-        self._lin4 = Linear(128, 2, dtype=float32)
-        self._scaling = tensor([pi, pi / 2])
-        self.apply(self._initialize)
-
-    @staticmethod
-    def _initialize(m):
-        """
-        Initializes weights using the kaiming-normal distribution and sets biases to zero.
-        """
-        if isinstance(m, Linear):
-            # manual_seed(2000)  # ensures reproducibility
-            kaiming_normal_(m.weight)
-            m.bias.data.fill_(0.)
-
-    def __call__(self, x: Tensor) -> Tensor:
-        x = self._lin1(x)
-        x = real(x)
-        x = self._lin2(x)
-        x = self._lin3(x)
-        x = self._lin4(x)
-        x = self._scaling * sigmoid(x)
-        return x
-
 
 def main():
     # initialize base classes
     env: Env = Env()
-    alice: Module = ComplexNetwork()
-    bob: Module = ComplexNetwork()
+    alice: Module = Transformer(num_players=2, num_encoder_layers=2, num_actions=2)
+    bob: Module = Transformer(num_players=2, num_encoder_layers=2, num_actions=2)
     al_op = Adam(params=alice.parameters())
     bo_op = Adam(params=bob.parameters())
+    player_tokens = eye(2)
 
-    episodes: int = 1000
+    episodes: int = 500
     fix_inp: bool = False
     fix_inp_time: int = int(episodes * 0.6)
 
@@ -186,10 +118,12 @@ def main():
     for step in range(1, episodes):
         # get state from environment
         state = env.reset(fix_inp=fix_inp)
+        inp_alice = (state, env.reward_distribution, player_tokens[0])
+        inp_bob = (state, env.reward_distribution, player_tokens[1])
 
         # compute actions
-        ac_alice = alice(state)
-        ac_bob = bob(state)
+        ac_alice = alice(*inp_alice)
+        ac_bob = bob(*inp_bob)
 
         # compute q-values
         q_alice, q_bob = env.step(ac_alice, ac_bob)
@@ -204,10 +138,12 @@ def main():
 
         # get state from environment
         state = env.reset(fix_inp=fix_inp)
+        inp_alice = (state, env.reward_distribution, player_tokens[0])
+        inp_bob = (state, env.reward_distribution, player_tokens[1])
 
         # compute actions
-        ac_bob = bob(state)
-        ac_alice = alice(state)
+        ac_alice = alice(*inp_alice)
+        ac_bob = bob(*inp_bob)
 
         # compute q-values
         q_alice, q_bob = env.step(ac_alice, ac_bob)
@@ -220,7 +156,7 @@ def main():
         bob_loss.backward()
         bo_op.step()
 
-        if step % 500 == 0:
+        if step % 5000 == 0:
             print('step: {}'.format(step))
             print(q_alice.item(), q_bob.item())
             print(ac_alice, ac_bob)
@@ -230,80 +166,10 @@ def main():
             fix_inp = True
 
     state = env.reset()
-    ac_al = alice(state)
-    ac_bo = bob(state)
-    reward_a, reward_b = env.step(ac_al, ac_bo)
-    print('-----')
-    print('actions after training: ')
-    print('alice: {}'.format(ac_al))
-    print('bob: {}'.format(ac_bo))
-    print('reward after training: {} {}'.format(reward_a.item(), reward_b.item()))
-    return ac_al, ac_bo
-
-
-# TODO: test same algorithm, different reward distribution
-def qmain():
-    # initialize base classes
-    env: Env = Env()
-    alice: Module = ComplexNetwork()
-    bob: Module = ComplexNetwork()
-    al_op = Adam(params=alice.parameters())
-    bo_op = Adam(params=bob.parameters())
-
-    episodes: int = 1000
-    fix_inp: bool = False
-    fix_inp_time: int = int(episodes * 0.6)
-
-    # loop over episodes
-    for step in range(1, episodes):
-        # get state from environment
-        state = env.reset(fix_inp=fix_inp)
-
-        # compute actions
-        ac_alice = alice(state)
-        ac_bob = bob(state)
-
-        # compute q-values
-        q_alice, q_bob = env.quantum_step(ac_alice, ac_bob)
-
-        # define loss
-        alice_loss: Tensor = -q_alice
-
-        # optimize alice
-        al_op.zero_grad()
-        alice_loss.backward()
-        al_op.step()
-
-        # get state from environment
-        state = env.reset(fix_inp=fix_inp)
-
-        # compute actions
-        ac_bob = bob(state)
-        ac_alice = alice(state)
-
-        # compute q-values
-        q_alice, q_bob = env.quantum_step(ac_alice, ac_bob)
-
-        # define loss
-        bob_loss: Tensor = -q_bob
-
-        # optimize bob
-        bo_op.zero_grad()
-        bob_loss.backward()
-        bo_op.step()
-
-        if step % 50 == 0:
-            print('step: {}'.format(step))
-            print(q_alice.item(), q_bob.item())
-            print(ac_alice, ac_bob)
-            print('---------')
-
-        if step == fix_inp_time:
-            fix_inp = True
-
-    state = env.reset()
-    ac_al = alice(state)
-    ac_bo = bob(state)
+    inp_alice = (state, env.reward_distribution, player_tokens[0])
+    inp_bob = (state, env.reward_distribution, player_tokens[1])
+    ac_al = alice(*inp_alice)
+    ac_bo = bob(*inp_bob)
     reward_a, reward_b = env.step(ac_al, ac_bo)
     print('-----')
     print('actions after training: ')
@@ -325,18 +191,6 @@ def sim_success_evaluation():
     times: int = 20
     for time in range(times):
         final_params1, final_params2 = main()
-        if check(final_params1) and check(final_params2):
-            print('training successful ...')
-            nums += 1
-    success_rate: float = nums / times
-    print('success rate: {}'.format(success_rate))
-
-
-def quantum_success_simulation():
-    nums: int = 0
-    times: int = 10
-    for time in range(times):
-        final_params1, final_params2 = qmain()
         if check(final_params1) and check(final_params2):
             print('training successful ...')
             nums += 1

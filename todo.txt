@@ -1,5 +1,7 @@
 # [qmain] test random inputs - check ... works astonishingly well
-# TODO: [env] implement two more games and run the algorithm on them
-# TODO: [penny] fix quantum learning process using pennylane
-# TODO: [env] integrate pennylane into env framework
+# [env] implement two more games and run the algorithm on them
+# [penny] fix quantum learning process using pennylane ... works
+# [env] integrate pennylane into env framework
 # [penny] understand measurements - check
+# TODO: design nash-scanner
+# TODO: create quantum-game dataset

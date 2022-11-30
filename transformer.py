@@ -1,23 +1,23 @@
 # py
 from typing import List
+from math import pi
 
 # nn & rl
-from torch import Tensor, tensor, rand, complex64, zeros, real, no_grad, cat, int64, float32
-from torch.nn import TransformerEncoderLayer, Module, Linear, Flatten
+from torch import Tensor, tensor, rand, complex64, zeros, real, no_grad, cat, relu, sigmoid
+from torch.nn import TransformerEncoderLayer, Module, Linear
 from torch.nn.init import kaiming_normal_
-from torch.nn.functional import one_hot
 
 
-class UnwantedError(Exception):
+class DimensionError(Exception):
 
     def __init__(self, message: str):
-        super(UnwantedError, self).__init__(message)
+        super(DimensionError, self).__init__(message)
 
 
-SE_PRE: int = 24
-RE_PRE: int = 32
-PTE_PRE: int = 8
-POST: int = 128
+SE_PRE: int = 12
+RE_PRE: int = 16
+PTE_PRE: int = 4
+POST: int = 64
 
 
 class StateEmbedding(Module):
@@ -39,7 +39,7 @@ class StateEmbedding(Module):
         elif len(x.shape) == 1:
             x = x.view(1, -1)
         else:
-            raise UnwantedError(
+            raise DimensionError(
                 "Unwanted behaviour is occurring as the input "
                 "of the state embedding does not have a valid shape."
             )
@@ -67,7 +67,7 @@ class RewardEmbedding(Module):
         try:
             assert len(x.shape) == 3 or len(x.shape) == 2
         except AssertionError:
-            raise UnwantedError(
+            raise DimensionError(
                 "Unwanted behaviour is occurring as the input "
                 "of the reward embedding does not have a valid shape."
             )
@@ -94,7 +94,7 @@ class PlayerTokenEmbedding(Module):
         elif len(x.shape) == 1:
             x = x.view(-1, 1)
         else:
-            raise UnwantedError(
+            raise DimensionError(
                 "Unwanted behaviour is occurring as the input "
                 "of the player token embedding does not have a valid shape."
             )
@@ -122,7 +122,7 @@ class Embedding(Module):
         elif len(embedded_state.shape) == 2:
             out: Tensor = cat((embedded_state, embedded_reward, embedded_player_token), dim=0)
         else:
-            raise UnwantedError(
+            raise DimensionError(
                 "Unwanted behaviour is occurring as the input "
                 "of the embedding does not have a valid shape."
             )
@@ -130,12 +130,22 @@ class Embedding(Module):
 
 
 class ParametrizationModule(Module):
-    _linear: Linear
-    _flatten: Flatten
+    _num_actions: int
+    _linear1: Linear
+    _linear2: Linear
+    _linear3: Linear
+    _layers: List[Linear]
 
     def __init__(self, num_actions: int):
         super(ParametrizationModule, self).__init__()
-        self._linear = Linear((SE_PRE + RE_PRE + PTE_PRE) * POST, num_actions)
+        self._num_actions = num_actions
+        self._linear1 = Linear((SE_PRE + RE_PRE + PTE_PRE) * POST, RE_PRE * POST)
+        self._linear2 = Linear(RE_PRE * POST, POST)
+        self._linear3 = Linear(POST, num_actions)
+        self._layers = [self._linear1, self._linear2, self._linear3]
+        self._scaling2 = tensor([pi, pi/2], requires_grad=True)
+        self._scaling3 = tensor([2*pi, pi, 2*pi], requires_grad=True)
+        self._translating3 = tensor([-pi, 0., -pi], requires_grad=True)
 
     def __call__(self, x: Tensor) -> Tensor:
         if len(x.shape) == 3:
@@ -143,11 +153,19 @@ class ParametrizationModule(Module):
         elif len(x.shape) == 2:
             x = x.view(1, -1)
         else:
-            raise UnwantedError(
+            raise DimensionError(
                 "Unwanted behaviour is occurring as the input "
                 "of the parametrization module does not have a valid shape."
             )
-        x = self._linear(x)
+        # apply layers
+        for layer in self._layers:
+            x = relu(x)
+            x = layer(x)
+        x = sigmoid(x)
+        if self._num_actions == 3:
+            x = self._scaling3 * x + self._translating3
+        elif self._num_actions == 2:
+            x = self._scaling2 * x
         if x.shape[0] == 1:
             return x.view(-1)
         return x
@@ -174,12 +192,3 @@ class Transformer(Module):
             x = enc_layer(x)
         x = self._parametrization_module(x)
         return x
-
-
-if __name__ == '__main__':
-    state_batch: Tensor = rand(64, 4, dtype=complex64)
-    reward_batch: Tensor = rand(64, 4, 2)
-    player_token_batch: Tensor = rand(64, 2)
-    transformer = Transformer(2, 3, 3)
-    output = transformer(state_batch, reward_batch, player_token_batch)
-    print(output.shape)

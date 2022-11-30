@@ -3,7 +3,7 @@ from typing import Optional, List, Tuple
 from math import sqrt, pi
 
 # nn & rl
-from torch import Tensor, tensor, kron, complex64, ones, linspace
+from torch import Tensor, tensor, kron, complex64, ones, linspace, exp, cos, sin, cat
 from torch.distributions import Distribution, Uniform
 
 # lib
@@ -130,12 +130,10 @@ class Env:
         assert len(args) == self._num_players
         # prepare initial_state
         self._state = self._J @ self._state
-
         # create operator which applies the local unitary actions
         op: Operator = self._operator(*args[0])
         for i in range(1, len(args)):
             op = op + self._operator(*args[i])
-
         # apply operator
         self._state = op @ self._state
         # apply adjoint state preparation operator
