@@ -2,7 +2,7 @@
 from typing import List, Tuple, Callable
 
 # nn & rl
-from torch import Tensor, complex64
+from torch import Tensor, complex64, kron
 from torch.distributions import Distribution, Uniform
 
 # quantum
@@ -67,6 +67,15 @@ class MultiEnv:
         self._num_players = self._reward_distribution.shape[1]
 
     @property
+    def J(self):
+        return self._J
+
+    @J.setter
+    def J(self, operator: Operator):
+        self._J = operator
+        self._adj_J = operator.adjoint
+
+    @property
     def action_space(self) -> ActionSpace:
         return self._action_space
 
@@ -81,7 +90,7 @@ class MultiEnv:
         self._reward_distribution = rew_dist / max(rew_dist.norm(), epsilon)
 
     def _observation(self) -> Tensor:
-        return (self._J @ QuantumSystem(self._num_players)).state
+        return (self._J @ QuantumSystem(num_qubits=self._num_players)).state
 
     def reset(self, fix_inp: bool) -> Tensor:
         if fix_inp:
@@ -90,27 +99,25 @@ class MultiEnv:
             rand_inp = self._uniform.sample((4,)).type(complex64)
             return self._observation() + rand_inp
 
-    def _create_operator(self, args: Tuple) -> Operator:
-        op: Operator = Operator(self._action_space.operator(args[0]))
+    def _create_operator(self, args: Tuple[Tensor]) -> Operator:
+        op: Tensor = self._action_space.operator(args[0])
         for i in range(1, len(args)):
-            op = op + Operator(self._action_space.operator(args[i]))
-        return op
+            op = kron(op, self._action_space.operator(args[i]))
+        return Operator(mat=op)
 
-    def run(self, *args) -> List[Tensor]:
+    def step(self, *args) -> List[Tensor]:
         # prepare initial_state
-        self._state = self._J @ self._state
+        self._state = self._J @ QuantumSystem(num_qubits=self._num_players)
         # create operator which applies the local unitary actions
         op = self._create_operator(args)
         # apply operator
         self._state = op @ self._state
         # apply adjoint state preparation operator
-        self._state = self._adj_J @ self._state
-        # get probs
-        probabilities = self._state.probs
+        self._state = self._J.adjoint @ self._state
         # get q-values
         qs: List = []
         for i in range(self._num_players):
-            q_i = (self._reward_distribution[:, i] * probabilities).sum()
+            q_i = (self._reward_distribution[:, i] * self._state.probs).sum()
             qs.append(q_i)
         return qs
 
