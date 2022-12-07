@@ -1,35 +1,16 @@
 # py
 from math import pi
-from typing import Optional, Tuple, Callable, List
-from random import randint
+from typing import Tuple, List
 
 # nn & rl
-from torch import tensor, Tensor, cat, kron, real, ones, complex64, float32, allclose, eye
-from torch import relu, sigmoid, exp, sin, cos, matrix_exp
-from torch.nn import Module, Linear
-from torch.nn.init import kaiming_normal_
+from torch import tensor, Tensor, kron, complex64, eye, matrix_exp
 from torch.optim import Adam, Optimizer
-from torch.distributions import Uniform, Distribution
-
-# quantum
-from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
-from quantum import QuantumSystem, Operator
+from quantum import Operator
 from multi_env import MultiEnv
 from transformer import Transformer
 from env import ActionSpace, GeneralActionSpace, RestrictedActionSpace
-from qmain import Env
-
-
-def sample_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
-    players: List[Transformer] = list()
-    player_indices: List[int] = list()
-    for _ in range(0, num_players):
-        rd_idx: int = randint(0, len(agents) - 1)
-        players.append(agents[rd_idx])
-        player_indices.append(rd_idx)
-    return players, player_indices
 
 
 def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
@@ -51,7 +32,6 @@ def train(episodes: int,
         state = env.reset(fix_inp=fix_inp)
 
         # sample players for the game
-        # players, player_indices = sample_players(num_players, agents)
         players, player_indices = static_order_players(num_players, agents)
 
         for player_idx in player_indices:
@@ -86,7 +66,8 @@ def main() -> List[Tensor]:
                         [-1., 0.]], dtype=complex64)
     mat: Tensor = matrix_exp(-1j * gamma * kron(D, D) / 2)
     J: Operator = Operator(mat=mat)
-    reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
+    # reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
+    reward_distribution: Tensor = tensor([[6., 6.], [2., 8.], [8., 2.], [0., 0.]])
     action_space: ActionSpace = RestrictedActionSpace()
 
     # initialize env
@@ -150,3 +131,4 @@ if __name__ == '__main__':
 
 # result (transformer, static_order): 1. success rate
 # result (transformer, only self-play): 0.55 success rate
+# result (transformer, random_order): 0.45 success rate

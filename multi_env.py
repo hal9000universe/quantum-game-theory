@@ -29,7 +29,6 @@ def create_circuit(num_players: int) -> Callable:
     return circuit
 
 
-# TODO: implement different J operators @{get, set}
 class MultiEnv:
     _reward_distribution: Tensor
     _num_players: int

@@ -1,22 +1,23 @@
 # py
-from typing import List
+from typing import List, Callable
 from math import pi
 
 # nn & rl
-from torch import Tensor, tensor, rand, complex64, zeros, real, no_grad, cat, relu, sigmoid
+from torch import Tensor, tensor, complex64, zeros, real, no_grad, cat, relu, sigmoid, clip
 from torch.nn import TransformerEncoderLayer, Module, Linear
 from torch.nn.init import kaiming_normal_
 
 
-class DimensionError(Exception):
+class UnwantedError(Exception):
 
     def __init__(self, message: str):
-        super(DimensionError, self).__init__(message)
+        super(UnwantedError, self).__init__(message)
 
 
-SE_PRE: int = 12
-RE_PRE: int = 16
-PTE_PRE: int = 4
+SCALE: int = 1
+SE_PRE: int = 10 * SCALE
+RE_PRE: int = 12 * SCALE
+PTE_PRE: int = 10 * SCALE
 POST: int = 64
 
 
@@ -39,7 +40,7 @@ class StateEmbedding(Module):
         elif len(x.shape) == 1:
             x = x.view(1, -1)
         else:
-            raise DimensionError(
+            raise UnwantedError(
                 "Unwanted behaviour is occurring as the input "
                 "of the state embedding does not have a valid shape."
             )
@@ -67,7 +68,7 @@ class RewardEmbedding(Module):
         try:
             assert len(x.shape) == 3 or len(x.shape) == 2
         except AssertionError:
-            raise DimensionError(
+            raise UnwantedError(
                 "Unwanted behaviour is occurring as the input "
                 "of the reward embedding does not have a valid shape."
             )
@@ -94,7 +95,7 @@ class PlayerTokenEmbedding(Module):
         elif len(x.shape) == 1:
             x = x.view(-1, 1)
         else:
-            raise DimensionError(
+            raise UnwantedError(
                 "Unwanted behaviour is occurring as the input "
                 "of the player token embedding does not have a valid shape."
             )
@@ -122,11 +123,57 @@ class Embedding(Module):
         elif len(embedded_state.shape) == 2:
             out: Tensor = cat((embedded_state, embedded_reward, embedded_player_token), dim=0)
         else:
-            raise DimensionError(
+            raise UnwantedError(
                 "Unwanted behaviour is occurring as the input "
                 "of the embedding does not have a valid shape."
             )
         return out
+
+
+class Mode:
+    _mode: str
+
+    def __init__(self):
+        self._mode = "clip"
+
+    def clip_mode(self):
+        self._mode = "clip"
+        return self
+
+    def sigmoid_mode(self):
+        self._mode = "sigmoid"
+        return self
+
+    def is_clip(self) -> bool:
+        return self._mode == "clip"
+
+    def is_sigmoid(self) -> bool:
+        return self._mode == "sigmoid"
+
+
+def make_clip_contraction(mins: Tensor, maxs: Tensor) -> Callable:
+    def contraction(x: Tensor) -> Tensor:
+        return clip(x, mins, maxs)
+
+    return contraction
+
+
+def make_sigmoid2_contraction(scaling: Tensor) -> Callable:
+    def contraction(x: Tensor) -> Tensor:
+        x = sigmoid(x)
+        x = scaling * x
+        return x
+
+    return contraction
+
+
+def make_sigmoid3_contraction(scaling: Tensor, translating: Tensor) -> Callable:
+    def contraction(x: Tensor) -> Tensor:
+        x = sigmoid(x)
+        x = scaling * x + translating
+        return x
+
+    return contraction
 
 
 class ParametrizationModule(Module):
@@ -135,17 +182,35 @@ class ParametrizationModule(Module):
     _linear2: Linear
     _linear3: Linear
     _layers: List[Linear]
+    _mins: Tensor
+    _maxs: Tensor
+    _scaling: Tensor
+    _translating: Tensor
 
-    def __init__(self, num_actions: int):
+    def __init__(self, num_actions: int, contraction_mode: Mode = Mode().sigmoid_mode()):
         super(ParametrizationModule, self).__init__()
         self._num_actions = num_actions
         self._linear1 = Linear((SE_PRE + RE_PRE + PTE_PRE) * POST, RE_PRE * POST)
         self._linear2 = Linear(RE_PRE * POST, POST)
         self._linear3 = Linear(POST, num_actions)
         self._layers = [self._linear1, self._linear2, self._linear3]
-        self._scaling2 = tensor([pi, pi/2], requires_grad=True)
-        self._scaling3 = tensor([2*pi, pi, 2*pi], requires_grad=True)
-        self._translating3 = tensor([-pi, 0., -pi], requires_grad=True)
+        if contraction_mode.is_clip() and num_actions == 3:
+            self._mins = tensor([-pi, 0, pi], requires_grad=True)
+            self._maxs = tensor([pi, pi, pi], requires_grad=True)
+            self._contraction = make_clip_contraction(self._mins, self._maxs)
+        elif contraction_mode.is_clip() and num_actions == 2:
+            self._mins = tensor([0., 0.], requires_grad=True)
+            self._maxs = tensor([pi, pi / 2], requires_grad=True)
+            self._contraction = make_clip_contraction(self._mins, self._maxs)
+        elif contraction_mode.is_sigmoid() and num_actions == 3:
+            self._scaling = tensor([2 * pi, pi, 2 * pi], requires_grad=True)
+            self._translating = tensor([-pi, 0., -pi], requires_grad=True)
+            self._contraction = make_sigmoid3_contraction(self._scaling, self._translating)
+        elif contraction_mode.is_sigmoid() and num_actions == 2:
+            self._scaling = tensor([pi, pi / 2], requires_grad=True)
+            self._contraction = make_sigmoid2_contraction(self._scaling)
+        else:
+            raise UnwantedError("Parametrization module has wrong number of actions.")
 
     def __call__(self, x: Tensor) -> Tensor:
         if len(x.shape) == 3:
@@ -153,7 +218,7 @@ class ParametrizationModule(Module):
         elif len(x.shape) == 2:
             x = x.view(1, -1)
         else:
-            raise DimensionError(
+            raise UnwantedError(
                 "Unwanted behaviour is occurring as the input "
                 "of the parametrization module does not have a valid shape."
             )
@@ -161,11 +226,8 @@ class ParametrizationModule(Module):
         for layer in self._layers:
             x = relu(x)
             x = layer(x)
-        x = sigmoid(x)
-        if self._num_actions == 3:
-            x = self._scaling3 * x + self._translating3
-        elif self._num_actions == 2:
-            x = self._scaling2 * x
+        # squash outputs to action space range
+        x = self._contraction(x)
         if x.shape[0] == 1:
             return x.view(-1)
         return x
@@ -184,7 +246,10 @@ class Transformer(Module):
         for _ in range(0, num_encoder_layers):
             enc_layer = TransformerEncoderLayer(d_model=POST, nhead=4, batch_first=True)
             self._transformer_encoder_layers.append(enc_layer)
-        self._parametrization_module = ParametrizationModule(num_actions=num_actions)
+        self._parametrization_module = ParametrizationModule(
+            num_actions=num_actions,
+            contraction_mode=Mode().sigmoid_mode(),
+        )
 
     def __call__(self, state: Tensor, rewards: Tensor, player_token: Tensor) -> Tensor:
         x: Tensor = self._embedding(state, rewards, player_token)

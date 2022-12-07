@@ -1,5 +1,5 @@
 # py
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Iterable
 from math import sqrt, pi
 
 # nn & rl
@@ -18,9 +18,24 @@ class ActionSpace:
 
     def __init__(self, ranges: List[Tuple[float, float]]):
         self._ranges = ranges
-        self._num_steps = 30
+        self._num_steps = 8
         self._num_params = len(ranges)
         self._ops = Ops()
+        self._iterator = self._generate_iterator()
+
+    def _generate_iterator(self) -> Iterable:
+        angles: List[Tensor] = []
+        for angle_range in self._ranges:
+            lin_space: Tensor = linspace(angle_range[0], angle_range[1], steps=self._num_steps)
+            angles.append(lin_space)
+        power: int
+        dims: int
+        for i in range(0, self._num_params):
+            power = len(self._ranges) - 1 - i
+            dims = i
+            angles[i] = angles[i].repeat_interleave(self._num_steps ** power)
+            angles[i] = angles[i].broadcast_to((self._num_steps ** dims, self._num_steps ** (power + 1))).flatten()
+        return zip(*angles)
 
     @property
     def num_params(self) -> int:
@@ -31,12 +46,8 @@ class ActionSpace:
         return self._num_steps
 
     @property
-    def iterator(self) -> List[Tensor]:
-        itr: List[Tensor] = []
-        for rng in self._ranges:
-            space: Tensor = linspace(rng[0], rng[1], steps=self._num_steps)
-            itr.append(space)
-        return itr
+    def iterator(self) -> Iterable:
+        return self._iterator
 
     def operator(self, params: Tensor) -> Tensor:
         raise NotImplementedError
@@ -146,3 +157,9 @@ class Env:
             q_i = (self._reward_distribution[:, i] * probs).sum()
             qs.append(q_i)
         return qs
+
+
+if __name__ == '__main__':
+    action_space = GeneralActionSpace()
+    for p in action_space.iterator:
+        print(p)
