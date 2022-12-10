@@ -76,6 +76,8 @@ class RewardEmbedding(Module):
         return x
 
 
+# TODO: research word embeddings (from one-hot to continuous representations)
+# TODO: rotate coordinate system of player-tokens (by pi/4 in all directions)
 class PlayerTokenEmbedding(Module):
 
     def __init__(self, num_players):

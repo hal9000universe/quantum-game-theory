@@ -15,6 +15,7 @@ from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
 from quantum import QuantumSystem, Operator
+from multi_env import MultiEnv
 
 
 def rotation_operator(params: Tensor) -> Operator:
@@ -59,6 +60,10 @@ class PrisonersDilemmaEnv:
         self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
 
     @property
+    def num_players(self) -> int:
+        return 2
+
+    @property
     def _ground_state(self) -> QuantumSystem:
         return QuantumSystem(num_qubits=2)
 
@@ -90,37 +95,20 @@ def generate_parameters() -> Tensor:
     return tensor([uniform_theta.sample((1,)), uniform_phi.sample((1,))], requires_grad=True)
 
 
-def main():
-    # initialize base classes
-    env: PrisonersDilemmaEnv = PrisonersDilemmaEnv()
-    episodes: int = 4000
-    alice_params: Tensor = generate_parameters()
-    bob_params: Tensor = generate_parameters()
-    alice_opt: Adam = Adam(params=[alice_params])
-    bob_opt: Adam = Adam(params=[bob_params])
-
+def main(env: MultiEnv, episodes: int):
+    # initialize params and optimizers
+    players_params: List[Tensor] = [generate_parameters() for _ in range(0, env.num_players)]
+    optimizers: List[Optimizer] = [Adam(params=[players_params[i]]) for i in range(0, env.num_players)]
     # loop over episodes
     for step in range(1, episodes):
-        # compute q-values
-        # alice optimization
-        q_alice, q_bob = env.step(alice_params, bob_params)
-        loss_alice: Tensor = -q_alice
-        alice_opt.zero_grad()
-        loss_alice.backward()
-        alice_opt.step()
-        # bob optimization
-        q_alice, q_bob = env.step(alice_params, bob_params)
-        loss_bob: Tensor = -q_bob
-        bob_opt.zero_grad()
-        loss_bob.backward()
-        bob_opt.step()
-
-        if step % 100000 == 0:
-            print(f"Step: {step}")
-            print(f"Actions: {alice_params, bob_params}")
-            print('---')
-
-    return alice_params, bob_params
+        # general optimization
+        for i in range(0, env.num_players):
+            qs: List[Tensor] = env.step(*players_params)
+            loss: Tensor = -qs[i]
+            optimizers[i].zero_grad()
+            loss.backward()
+            optimizers[i].step()
+    return players_params
 
 
 def check(final_params: Tensor) -> bool:
@@ -134,7 +122,7 @@ def sim_success_evaluation():
     nums: int = 0
     times: int = 100
     for time in range(times):
-        final_params1, final_params2 = main()
+        final_params1, final_params2 = main(PrisonersDilemmaEnv(), 4000)
         print(f"final actions: {final_params1, final_params2}")
         if check(final_params1) and check(final_params2):
             print('training successful ...')

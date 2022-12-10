@@ -29,6 +29,7 @@ def create_circuit(num_players: int) -> Callable:
     return circuit
 
 
+# TODO: implement random symmetric game
 class MultiEnv:
     _reward_distribution: Tensor
     _num_players: int
@@ -50,6 +51,10 @@ class MultiEnv:
         self._state = QuantumSystem(self._num_players)
         self._J = self._ops.J.inject(self._num_players)
         self._adj_J = self._J.adjoint
+
+    @property
+    def num_players(self) -> int:
+        return self._num_players
 
     @property
     def reward_distribution(self) -> Tensor:
@@ -120,7 +125,7 @@ class MultiEnv:
             qs.append(q_i)
         return qs
 
-    def q_run(self, *args) -> List[Tensor]:
+    def q_step(self, *args) -> List[Tensor]:
         ops: List[Tensor] = []
         for params in args:
             op: Tensor = self._action_space.operator(params)

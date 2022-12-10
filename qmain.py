@@ -241,7 +241,7 @@ def main():
     return ac_al, ac_bo
 
 
-# TODO: test same algorithm, different reward distribution
+# TODO: extensive testing on various reward distributions (requires nash-solver)
 def qmain():
     # initialize base classes
     env: Env = Env()

@@ -1,2 +1,1 @@
-# TODO: create nash-scanner
-# TODO: create dataset
+# TODO: create dataset (requires nash-scanner)
