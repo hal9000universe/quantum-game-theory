@@ -1,16 +1,18 @@
 # py
 from math import pi
-from typing import Tuple, List
+from typing import Tuple, List, Callable
 
 # nn & rl
 from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, allclose
 from torch.optim import Adam, Optimizer
 
 # lib
-from quantum import Operator
-from multi_env import MultiEnv
-from action_space import ActionSpace, GeneralActionSpace, RestrictedActionSpace
-from transformer import Transformer
+from base.quantum import Operator
+from base.multi_env import MultiEnv
+from base.action_space import ActionSpace, RestrictedActionSpace
+from base.transformer import Transformer
+from dataset.dataset import GameNashDataset, MicroGameNashDataset
+from base.utils import calc_dist
 
 
 def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
@@ -58,7 +60,7 @@ def train(episodes: int,
     return agents
 
 
-def main() -> List[Tensor]:
+def main(reward_distribution: Tensor) -> Tensor:
     # define quantum game
     num_players: int = 2
     gamma: float = pi / 2
@@ -66,8 +68,6 @@ def main() -> List[Tensor]:
                         [-1., 0.]], dtype=complex64)
     mat: Tensor = matrix_exp(-1j * gamma * kron(D, D) / 2)
     J: Operator = Operator(mat=mat)
-    reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
-    # reward_distribution: Tensor = tensor([[6., 6.], [2., 8.], [8., 2.], [0., 0.]])
     action_space: ActionSpace = RestrictedActionSpace()
 
     # initialize env
@@ -91,8 +91,8 @@ def main() -> List[Tensor]:
         optimizers.append(optim)
 
     # define hyperparameters
-    episodes: int = 500
-    fix_inp: bool = False
+    episodes: int = 100
+    fix_inp: bool = True  # TODO: test fixed inp and noisy actions
     fix_inp_time: int = int(episodes * 0.6)
 
     # inputs
@@ -116,38 +116,51 @@ def main() -> List[Tensor]:
     print('-----')
     state = env.reset(fix_inp=fix_inp)
     players, player_indices = static_order_players(num_players, agents)
-    actions: List[Tensor] = []
+    actions: List[Tuple[Tensor, ...]] = []
     for i, player in enumerate(players):
         params: Tensor = player(state, reward_distribution, player_tokens[i])
-        actions.append(params)
+        actions.append(tuple(params))
     qs = env.step(*actions)
     print(f"Actions: {actions}")
     print(f"Rewards: {qs}")
-    return actions
+    return tensor(actions)
 
 
-def check(final_params: Tensor) -> bool:
-    learned: bool = allclose(final_params, tensor([0., pi / 2]),
-                             rtol=0.05,
-                             atol=0.05)
+def check(final_params: Tensor, solution: Tensor) -> bool:
+    learned: bool = allclose(final_params, solution,
+                             rtol=0.1,
+                             atol=0.1)
     return learned
 
 
-def sim_success_evaluation():
-    nums: int = 0
-    times: int = 100
-    for time in range(times):
-        final_params1, final_params2 = main()
-        if check(final_params1) and check(final_params2):
-            print('training successful ...')
-            nums += 1
-    success_rate: float = nums / times
-    print('success rate: {}'.format(success_rate))
+def test_algorithm() -> float:
+    # (Noisy Inputs) Success rate: 0.452
+    ds: GameNashDataset = GameNashDataset()
+    parametrization: Callable = RestrictedActionSpace().operator
+
+    num_games: int = len(ds)
+    num_successes: int = 0
+
+    for i, (reward_distribution, nash_eq) in enumerate(ds):
+        actions: Tensor = main(reward_distribution)
+        dist: Tensor = calc_dist(nash_eq, actions, parametrization)
+        if dist < 0.2:
+            num_successes += 1
+        print(f"Game: {i} - Dist: {dist} - Successes: {num_successes}")
+
+    return num_successes / num_games
 
 
 if __name__ == '__main__':
-    sim_success_evaluation()
+    success_rate: float = test_algorithm()
+    print(f"Success rate: {success_rate}")
 
+
+# experiments
 # result (transformer, static_order): 1. success rate
 # result (transformer, only self-play): 0.55 success rate
 # result (transformer, random_order): 0.45 success rate
+
+# quantum games
+# reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])  # Prisoner's Dilemma
+# reward_distribution: Tensor = tensor([[6., 6.], [2., 8.], [8., 2.], [0., 0.]])  # Chicken's Dilemma

@@ -8,33 +8,18 @@ from torch.optim import Adam, Optimizer
 from torch.distributions import Distribution, Uniform
 
 # lib
-from quantum import Operator
-from transformer import Transformer
-from action_space import ActionSpace, GeneralActionSpace, RestrictedActionSpace
-from multi_env import MultiEnv
-from nash import compute_nash_eq_b
-from general import static_order_players
+from base.quantum import Operator
+from base.transformer import Transformer
+from base.action_space import ActionSpace, RestrictedActionSpace
+from base.multi_env import MultiEnv
+from base.nash import compute_nash_eq_b
+from base.general import static_order_players
+from base.utils import calc_dist
 
 # plotting
 import matplotlib.pyplot as plt
 import tikzplotlib
 from numpy import ndarray, linspace, concatenate
-
-
-def calc_dist(nash_eq: List[Tuple[Tensor, ...]], params: List[Tensor]) -> Tensor:
-    nash_eq_t: List = []
-    params_t: List = []
-    for elem in nash_eq:
-        for item in elem:
-            nash_eq_t.append(item)
-    for elem in params:
-        for item in elem:
-            params_t.append(item)
-    nash_eq_tensor: Tensor = tensor(nash_eq_t)
-    params_tensor: Tensor = tensor(params_t)
-    diff: Tensor = nash_eq_tensor - params_tensor
-    dist: Tensor = diff.square().sum().sqrt()
-    return dist
 
 
 def create_dilemma() -> MultiEnv:

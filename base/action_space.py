@@ -6,7 +6,7 @@ from math import pi
 from torch import Tensor, linspace, exp, cos, sin, cat
 
 # lib
-from quantum import Ops
+from base.quantum import Ops
 
 
 class ActionSpace:

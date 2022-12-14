@@ -1,5 +1,5 @@
 # py
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 
 # nn & rl
 from torch import Tensor, complex64, kron, tensor
@@ -9,8 +9,8 @@ from torch.distributions import Distribution, Uniform
 from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
-from action_space import ActionSpace, GeneralActionSpace, RestrictedActionSpace
-from quantum import QuantumSystem, Ops, Operator
+from base.action_space import ActionSpace, GeneralActionSpace, RestrictedActionSpace
+from base.quantum import QuantumSystem, Ops, Operator
 
 
 def create_circuit(num_players: int) -> Callable:
@@ -29,7 +29,6 @@ def create_circuit(num_players: int) -> Callable:
     return circuit
 
 
-# TODO: implement random symmetric game
 class MultiEnv:
     _reward_distribution: Tensor
     _num_players: int
@@ -40,6 +39,7 @@ class MultiEnv:
     _state: QuantumSystem
     _J: Operator
     _J_adj: Operator
+    _nash_eq: Optional[List[Tuple[Tensor, ...]]]
 
     def __init__(self, num_players: int):
         self._num_players = num_players
@@ -51,6 +51,15 @@ class MultiEnv:
         self._state = QuantumSystem(self._num_players)
         self._J = self._ops.J.inject(self._num_players)
         self._adj_J = self._J.adjoint
+        self._nash_eq = None
+
+    @property
+    def nash_eq(self) -> Optional[List[Tuple[Tensor, ...]]]:
+        return self._nash_eq
+
+    @nash_eq.setter
+    def nash_eq(self, nash_eq: Optional[List[Tuple[Tensor, ...]]]):
+        self._nash_eq = nash_eq
 
     @property
     def num_players(self) -> int:

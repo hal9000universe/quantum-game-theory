@@ -9,9 +9,9 @@ from torch import Tensor, tensor, zeros
 from torch import complex64, kron, matrix_exp
 
 # lib
-from quantum import Operator
-from action_space import ActionSpace, RestrictedActionSpace, GeneralActionSpace
-from multi_env import MultiEnv
+from base.quantum import Operator
+from base.action_space import ActionSpace, RestrictedActionSpace, GeneralActionSpace
+from base.multi_env import MultiEnv
 
 
 def is_nash(equilibrium: List, env: MultiEnv) -> bool:
@@ -27,7 +27,7 @@ def is_nash(equilibrium: List, env: MultiEnv) -> bool:
     return True
 
 
-def compute_nash_eq_b(env: MultiEnv) -> Optional[List[Tuple[Tensor, ...]]]:
+def compute_nash_eq_b(env: MultiEnv) -> Optional[Tensor]:
     action_space_grid: List[Tuple[Tensor, ...]] = []
     for action in env.action_space.iterator:
         action_space_grid.append(action)
@@ -35,4 +35,4 @@ def compute_nash_eq_b(env: MultiEnv) -> Optional[List[Tuple[Tensor, ...]]]:
     for strats in action_combinations:
         strategies: List[Tuple[Tensor, ...]] = list(strats)
         if is_nash(strategies, env):
-            return strategies
+            return tensor(strategies)

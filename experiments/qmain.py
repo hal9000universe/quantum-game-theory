@@ -4,7 +4,7 @@ from typing import Optional, Tuple, Callable, List
 
 # nn & rl
 from torch import tensor, Tensor, cat, kron, real, ones, complex64, float32, allclose
-from torch import relu, sigmoid, exp, sin, cos, matrix_exp
+from torch import sigmoid, exp, sin, cos, matrix_exp
 from torch.nn import Module, Linear
 from torch.nn.init import kaiming_normal_
 from torch.optim import Adam
@@ -14,8 +14,8 @@ from torch.distributions import Uniform, Distribution
 from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
-from quantum import QuantumSystem, Operator
-from action_space import RestrictedActionSpace, ActionSpace
+from base.quantum import QuantumSystem, Operator
+from base.action_space import RestrictedActionSpace
 
 
 def rotation_operator(params: Tensor) -> Operator:
@@ -188,7 +188,7 @@ def main():
     bo_op = Adam(params=bob.parameters())
 
     episodes: int = 1000
-    fix_inp: bool = True
+    fix_inp: bool = False
     fix_inp_time: int = int(episodes * 0.6)
 
     # loop over episodes
