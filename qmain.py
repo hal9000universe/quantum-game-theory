@@ -15,6 +15,7 @@ from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
 from quantum import QuantumSystem, Operator
+from action_space import RestrictedActionSpace, ActionSpace
 
 
 def rotation_operator(params: Tensor) -> Operator:
@@ -79,6 +80,14 @@ class Env:
         self._rewards = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
         # create uniform input distribution
         self._uniform = Uniform(-0.25, 0.25)
+
+    @property
+    def reward_distribution(self):
+        return self._rewards
+
+    @property
+    def action_space(self):
+        return RestrictedActionSpace()
 
     @property
     def _ground_state(self) -> QuantumSystem:
@@ -157,7 +166,7 @@ class ComplexNetwork(Module):
         """
         if isinstance(m, Linear):
             # manual_seed(2000)  # ensures reproducibility
-            kaiming_normal_(m.weight)
+            m.weight = kaiming_normal_(m.weight)
             m.bias.data.fill_(0.)
 
     def __call__(self, x: Tensor) -> Tensor:
@@ -179,7 +188,7 @@ def main():
     bo_op = Adam(params=bob.parameters())
 
     episodes: int = 1000
-    fix_inp: bool = False
+    fix_inp: bool = True
     fix_inp_time: int = int(episodes * 0.6)
 
     # loop over episodes
@@ -220,7 +229,7 @@ def main():
         bob_loss.backward()
         bo_op.step()
 
-        if step % 500 == 0:
+        if step % 5000 == 0:  # lower for better monitoring
             print('step: {}'.format(step))
             print(q_alice.item(), q_bob.item())
             print(ac_alice, ac_bob)
@@ -241,7 +250,6 @@ def main():
     return ac_al, ac_bo
 
 
-# TODO: extensive testing on various reward distributions (requires nash-solver)
 def qmain():
     # initialize base classes
     env: Env = Env()
@@ -322,7 +330,7 @@ def check(final_params: Tensor) -> bool:
 
 def sim_success_evaluation():
     nums: int = 0
-    times: int = 20
+    times: int = 30
     for time in range(times):
         final_params1, final_params2 = main()
         if check(final_params1) and check(final_params2):
@@ -346,4 +354,5 @@ def quantum_success_simulation():
 
 if __name__ == '__main__':
     sim_success_evaluation()
-    # result: 1. success rate
+    # result (fluctuating input): 1. success rate
+    # result (fixed input): 0.2 success rate

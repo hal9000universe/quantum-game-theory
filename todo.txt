@@ -4,10 +4,8 @@
 # [env] integrate pennylane into env framework
 # [penny] understand measurements - check
 # [nash]: design nash-scanner
-# TODO: implement UniformNoisyActions Experiment
-# TODO: Ornstein-Uhlenbeck Process NoisyActions Experiment
+# [plotting] implement NoisyActions Experiment
 # TODO: research word embeddings (from one-hot to continuous representations)
-# TODO: rotate coordinate system of player-tokens (by pi/4 in all directions)
 # TODO: implement random symmetric game
 # TODO: translate checking is_nash to simplified algorithm
 # TODO: speed up algorithm by combining coarse region search with exact nash-equilibrium search

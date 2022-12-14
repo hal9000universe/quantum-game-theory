@@ -3,14 +3,14 @@ from math import pi
 from typing import Tuple, List
 
 # nn & rl
-from torch import tensor, Tensor, kron, complex64, eye, matrix_exp
+from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, allclose
 from torch.optim import Adam, Optimizer
 
 # lib
 from quantum import Operator
 from multi_env import MultiEnv
+from action_space import ActionSpace, GeneralActionSpace, RestrictedActionSpace
 from transformer import Transformer
-from env import ActionSpace, GeneralActionSpace, RestrictedActionSpace
 
 
 def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
@@ -66,8 +66,8 @@ def main() -> List[Tensor]:
                         [-1., 0.]], dtype=complex64)
     mat: Tensor = matrix_exp(-1j * gamma * kron(D, D) / 2)
     J: Operator = Operator(mat=mat)
-    # reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
-    reward_distribution: Tensor = tensor([[6., 6.], [2., 8.], [8., 2.], [0., 0.]])
+    reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
+    # reward_distribution: Tensor = tensor([[6., 6.], [2., 8.], [8., 2.], [0., 0.]])
     action_space: ActionSpace = RestrictedActionSpace()
 
     # initialize env
@@ -91,7 +91,7 @@ def main() -> List[Tensor]:
         optimizers.append(optim)
 
     # define hyperparameters
-    episodes: int = 100
+    episodes: int = 500
     fix_inp: bool = False
     fix_inp_time: int = int(episodes * 0.6)
 
@@ -126,8 +126,27 @@ def main() -> List[Tensor]:
     return actions
 
 
+def check(final_params: Tensor) -> bool:
+    learned: bool = allclose(final_params, tensor([0., pi / 2]),
+                             rtol=0.05,
+                             atol=0.05)
+    return learned
+
+
+def sim_success_evaluation():
+    nums: int = 0
+    times: int = 100
+    for time in range(times):
+        final_params1, final_params2 = main()
+        if check(final_params1) and check(final_params2):
+            print('training successful ...')
+            nums += 1
+    success_rate: float = nums / times
+    print('success rate: {}'.format(success_rate))
+
+
 if __name__ == '__main__':
-    main()
+    sim_success_evaluation()
 
 # result (transformer, static_order): 1. success rate
 # result (transformer, only self-play): 0.55 success rate

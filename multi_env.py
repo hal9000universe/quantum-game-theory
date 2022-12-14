@@ -2,14 +2,14 @@
 from typing import List, Tuple, Callable
 
 # nn & rl
-from torch import Tensor, complex64, kron
+from torch import Tensor, complex64, kron, tensor
 from torch.distributions import Distribution, Uniform
 
 # quantum
 from pennylane import qnode, QubitUnitary, probs, device, Device
 
 # lib
-from env import ActionSpace, GeneralActionSpace, RestrictedActionSpace
+from action_space import ActionSpace, GeneralActionSpace, RestrictedActionSpace
 from quantum import QuantumSystem, Ops, Operator
 
 
@@ -56,6 +56,10 @@ class MultiEnv:
     def num_players(self) -> int:
         return self._num_players
 
+    @num_players.setter
+    def num_players(self, num_players: int):
+        self._num_players = num_players
+
     @property
     def reward_distribution(self) -> Tensor:
         return self._reward_distribution
@@ -88,10 +92,15 @@ class MultiEnv:
         self._action_space = action_space
 
     def generate_random(self):
-        epsilon: float = 1e-8
         shape: Tuple[int, int] = (pow(2, self._num_players), self._num_players)
         rew_dist: Tensor = self._uniform.sample(shape)
-        self._reward_distribution = rew_dist / max(rew_dist.norm(), epsilon)
+        self.reward_distribution = rew_dist
+
+    def generate_random_symmetric(self):
+        rewards: Tensor = self._uniform.sample((4,))
+        rew_dist: Tensor = tensor([[rewards[0], rewards[0]], [rewards[1], rewards[2]], [rewards[2], rewards[1]],
+                                   [rewards[3], rewards[3]]])
+        self.reward_distribution = rew_dist
 
     def _observation(self) -> Tensor:
         return (self._J @ QuantumSystem(num_qubits=self._num_players)).state

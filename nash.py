@@ -10,7 +10,7 @@ from torch import complex64, kron, matrix_exp
 
 # lib
 from quantum import Operator
-from env import ActionSpace, RestrictedActionSpace, GeneralActionSpace
+from action_space import ActionSpace, RestrictedActionSpace, GeneralActionSpace
 from multi_env import MultiEnv
 
 
@@ -27,7 +27,7 @@ def is_nash(equilibrium: List, env: MultiEnv) -> bool:
     return True
 
 
-def compute_nash_eq_b(env: MultiEnv) -> List[Tuple[Tensor, ...]]:
+def compute_nash_eq_b(env: MultiEnv) -> Optional[List[Tuple[Tensor, ...]]]:
     action_space_grid: List[Tuple[Tensor, ...]] = []
     for action in env.action_space.iterator:
         action_space_grid.append(action)
@@ -36,7 +36,3 @@ def compute_nash_eq_b(env: MultiEnv) -> List[Tuple[Tensor, ...]]:
         strategies: List[Tuple[Tensor, ...]] = list(strats)
         if is_nash(strategies, env):
             return strategies
-
-
-# TODO: translate checking is_nash to simplified algorithm
-# TODO: speed up algorithm by combining coarse region search with exact nash-equilibrium search
