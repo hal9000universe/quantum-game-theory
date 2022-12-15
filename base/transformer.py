@@ -151,29 +151,45 @@ class Mode:
         return self._mode == "sigmoid"
 
 
-def make_clip_contraction(mins: Tensor, maxs: Tensor) -> Callable:
-    def contraction(x: Tensor) -> Tensor:
-        return clip(x, mins, maxs)
+class ClipContraction(Module):
+    _mins: Tensor
+    _maxs: Tensor
+    
+    def __init__(self, mins: Tensor, maxs: Tensor):
+        super(ClipContraction, self).__init__()
+        self._mins = mins
+        self._maxs = maxs
 
-    return contraction
+    def __call__(self, x: Tensor) -> Tensor:
+        return clip(x, self._mins, self._maxs)
 
 
-def make_sigmoid2_contraction(scaling: Tensor) -> Callable:
-    def contraction(x: Tensor) -> Tensor:
+class Sigmoid2Contraction(Module):
+    _scaling: Tensor
+
+    def __init__(self, scaling: Tensor):
+        super(Sigmoid2Contraction, self).__init__()
+        self._scaling = scaling
+
+    def __call__(self, x: Tensor) -> Tensor:
         x = sigmoid(x)
-        x = scaling * x
+        x = self._scaling * x
         return x
 
-    return contraction
 
+class Sigmoid3Contraction(Module):
+    _scaling: Tensor
+    _translating: Tensor
 
-def make_sigmoid3_contraction(scaling: Tensor, translating: Tensor) -> Callable:
-    def contraction(x: Tensor) -> Tensor:
+    def __init__(self, scaling: Tensor, translating: Tensor):
+        super(Sigmoid3Contraction, self).__init__()
+        self._scaling = scaling
+        self._translating = translating
+
+    def __call__(self, x: Tensor) -> Tensor:
         x = sigmoid(x)
-        x = scaling * x + translating
+        x = self._scaling * x + self._translating
         return x
-
-    return contraction
 
 
 class ParametrizationModule(Module):
@@ -182,10 +198,7 @@ class ParametrizationModule(Module):
     _linear2: Linear
     _linear3: Linear
     _layers: List[Linear]
-    _mins: Tensor
-    _maxs: Tensor
-    _scaling: Tensor
-    _translating: Tensor
+    _contraction: Module
 
     def __init__(self, num_actions: int, contraction_mode: Mode = Mode().sigmoid_mode()):
         super(ParametrizationModule, self).__init__()
@@ -195,20 +208,20 @@ class ParametrizationModule(Module):
         self._linear3 = Linear(POST, num_actions)
         self._layers = [self._linear1, self._linear2, self._linear3]
         if contraction_mode.is_clip() and num_actions == 3:
-            self._mins = tensor([-pi, 0, pi], requires_grad=True)
-            self._maxs = tensor([pi, pi, pi], requires_grad=True)
-            self._contraction = make_clip_contraction(self._mins, self._maxs)
+            mins = tensor([-pi, 0, pi], requires_grad=True)
+            maxs = tensor([pi, pi, pi], requires_grad=True)
+            self._contraction = ClipContraction(mins, maxs)
         elif contraction_mode.is_clip() and num_actions == 2:
-            self._mins = tensor([0., 0.], requires_grad=True)
-            self._maxs = tensor([pi, pi / 2], requires_grad=True)
-            self._contraction = make_clip_contraction(self._mins, self._maxs)
+            mins = tensor([0., 0.], requires_grad=True)
+            maxs = tensor([pi, pi / 2], requires_grad=True)
+            self._contraction = ClipContraction(mins, maxs)
         elif contraction_mode.is_sigmoid() and num_actions == 3:
             self._scaling = tensor([2 * pi, pi, 2 * pi], requires_grad=True)
             self._translating = tensor([-pi, 0., -pi], requires_grad=True)
-            self._contraction = make_sigmoid3_contraction(self._scaling, self._translating)
+            self._contraction = Sigmoid3Contraction(self._scaling, self._translating)
         elif contraction_mode.is_sigmoid() and num_actions == 2:
             self._scaling = tensor([pi, pi / 2], requires_grad=True)
-            self._contraction = make_sigmoid2_contraction(self._scaling)
+            self._contraction = Sigmoid2Contraction(self._scaling)
         else:
             raise UnwantedError("Parametrization module has wrong number of actions.")
 

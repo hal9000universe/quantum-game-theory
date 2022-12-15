@@ -40,7 +40,7 @@ def train(num_episodes: int,
           train_ds: DataLoader,
           val_ds: DataLoader) -> Transformer:
     loss_function: Callable = HuberLoss()
-    for episode in range(0, num_episodes):
+    for episode in range(1, num_episodes + 1):
         train_losses: List[Tensor] = list()
         for i, (x_batch, nash_batch) in enumerate(train_ds):
             action_batch: Tensor = agent(*x_batch)
@@ -50,9 +50,27 @@ def train(num_episodes: int,
             optimizer.step()
             train_losses.append(loss)
             if i % 50 == 0:
+                # monitoring
                 mean_val_loss: Tensor = validate(val_ds, loss_function, agent)
                 mean_train_loss: Tensor = tensor(train_losses).mean(0)
                 print(f"Episode: {episode} - Train Loss: {mean_train_loss} - Validation Loss: {mean_val_loss}")
+        if episode % 5 == 0:
+            # save model
+            save_path: str = get_next_model_path()
+            save(agent, save_path)
+    return agent
+
+
+def get_max_idx() -> int:
+    is_max: bool = False
+    idx: int = -1
+    while not is_max:
+        path: str = get_model_path(idx + 1)
+        if exists(path):
+            idx += 1
+            continue
+        else:
+            return idx
 
 
 def get_model_path(idx: int) -> str:
@@ -60,15 +78,8 @@ def get_model_path(idx: int) -> str:
 
 
 def get_next_model_path() -> str:
-    is_max: bool = False
-    idx: int = 0
-    while not is_max:
-        path: str = get_model_path(idx)
-        if exists(path):
-            idx += 1
-            continue
-        else:
-            return path
+    next_idx: int = get_max_idx() + 1
+    return get_model_path(next_idx)
 
 
 def main():
@@ -104,7 +115,7 @@ def main():
     qt_test_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.9, end=1.)
 
     # training
-    num_episodes: int = 10
+    num_episodes: int = 15
     agent = train(
         num_episodes=num_episodes,
         agent=agent,
@@ -120,6 +131,13 @@ def main():
     # save model
     save_path: str = get_next_model_path()
     save(agent, save_path)
+
+    # load
+    agent: Transformer = load(get_model_path(get_max_idx()))
+
+    # testing after loading
+    test_loss: Tensor = test(qt_test_ds, agent)
+    print(f"Test Loss: {test_loss}")
 
 
 if __name__ == '__main__':
