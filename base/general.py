@@ -3,7 +3,7 @@ from math import pi
 from typing import Tuple, List, Callable
 
 # nn & rl
-from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, allclose
+from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, allclose, load
 from torch.optim import Adam, Optimizer
 
 # lib
@@ -13,6 +13,7 @@ from base.action_space import ActionSpace, RestrictedActionSpace
 from base.transformer import Transformer
 from dataset.dataset import GameNashDataset, MicroGameNashDataset
 from base.utils import calc_dist
+from training.training import get_max_idx, get_model_path
 
 
 def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
@@ -60,7 +61,7 @@ def train(episodes: int,
     return agents
 
 
-def main(reward_distribution: Tensor) -> Tensor:
+def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
     # define quantum game
     num_players: int = 2
     gamma: float = pi / 2
@@ -81,18 +82,21 @@ def main(reward_distribution: Tensor) -> Tensor:
     agents: List[Transformer] = list()
     optimizers: List[Optimizer] = list()
     for _ in range(0, num_players):
-        player: Transformer = Transformer(
-            num_players=num_players,
-            num_encoder_layers=num_encoder_layers,
-            num_actions=env.action_space.num_params,
-        )
+        if load_model:
+            player: Transformer = load(get_model_path(get_max_idx()))
+        else:
+            player: Transformer = Transformer(
+                num_players=num_players,
+                num_encoder_layers=num_encoder_layers,
+                num_actions=env.action_space.num_params,
+            )
         optim: Optimizer = Adam(params=player.parameters())
         agents.append(player)
         optimizers.append(optim)
 
     # define hyperparameters
     episodes: int = 100
-    fix_inp: bool = True  # TODO: test fixed inp and noisy actions
+    fix_inp: bool = True
     fix_inp_time: int = int(episodes * 0.6)
 
     # inputs
@@ -134,8 +138,11 @@ def check(final_params: Tensor, solution: Tensor) -> bool:
 
 
 def test_algorithm() -> float:
-    # (Noisy Inputs) Success rate: 0.452
-    ds: GameNashDataset = GameNashDataset()
+    # (Noisy Inputs) Success rate: 0.45
+    # (Fixed Inputs) Success rate: 0.43
+    # (Trained Model, Noisy Inputs) Success rate: 0.88
+    # (Trained Model, Fixed Inputs) Success rate: 0.87
+    ds = load("dataset/game-nash-datasets/game-nash-dataset-125.pth")
     parametrization: Callable = RestrictedActionSpace().operator
 
     num_games: int = len(ds)

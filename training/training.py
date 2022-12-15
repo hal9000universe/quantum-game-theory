@@ -12,7 +12,7 @@ from torch.nn.modules import HuberLoss
 from base.utils import create_env
 from base.multi_env import MultiEnv
 from base.transformer import Transformer
-from dataset.dataset import QuantumTrainingDataset, MicroQuantumTrainingDataset, split_dataset
+from dataset.dataset import QuantumTrainingDataset, MicroQuantumTrainingDataset
 
 
 def validate(val_ds: DataLoader, loss_function: Callable, agent: Transformer) -> Tensor:

@@ -163,14 +163,8 @@ def get_gn_path(idx: int) -> str:
     return f"dataset/game-nash-datasets/game-nash-dataset-{idx}.pth"
 
 
-def split_dataset(ds: Dataset) -> Tuple[Dataset, Dataset, Dataset]:
-    ratio: List[float] = [0.8, 0.1, 0.1]
-    train_ds, val_ds, test_ds = random_split(dataset=ds, lengths=ratio)
-    return train_ds, val_ds, test_ds
-
-
 if __name__ == '__main__':
-    qt_dataset = QuantumTrainingDataset(end=1.)
+    qt_dataset = QuantumTrainingDataset()
     print(len(qt_dataset))
     print("Done!")
 

@@ -5,8 +5,7 @@
 # [penny] understand measurements - check
 # [nash]: design nash-scanner
 # [plotting] implement NoisyActions Experiment
-# TODO: research word embeddings (from one-hot to continuous representations)
-# TODO: implement random symmetric game
+# [multi_env] implement random symmetric game
 # TODO: translate checking is_nash to simplified algorithm
 # TODO: speed up algorithm by combining coarse region search with exact nash-equilibrium search
-# TODO: create quantum-game dataset
+# [dataset] create quantum-game dataset
