@@ -6,7 +6,7 @@ from itertools import chain
 
 # nn & rl
 from torch import Tensor, eye, save, load
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import Dataset, IterableDataset, random_split
 
 # lib
 from base.utils import create_env
@@ -35,11 +35,21 @@ class MicroQuantumTrainingDataset(IterableDataset, ABC):
 class QuantumTrainingDataset(IterableDataset, ABC):
     _iterable: List[MicroQuantumTrainingDataset]
 
-    def __init__(self):
-        max_ds_idx: int = compute_max_ds_idx(get_micro_iqnd_path)
+    def __init__(self, start: Optional[int | float] = None, end: Optional[int | float] = None):
+        max_ds_idx: int = compute_max_ds_idx(get_mqt_path)
         ds_iter: List[IterableDataset] = list()
-        for idx in range(0, max_ds_idx):
-            ds: IterableDataset = load(get_micro_iqnd_path(idx))
+        if not start:
+            start = 0
+        if not end:
+            end = max_ds_idx
+        if isinstance(start, float):
+            assert start < 1.
+            start: int = (max_ds_idx * start).__int__()
+        if isinstance(end, float):
+            assert end <= 1.
+            end: int = (max_ds_idx * end).__int__()
+        for idx in range(start, end):
+            ds: IterableDataset = load(get_mqt_path(idx))
             ds_iter.append(ds)
         self._iterable = ds_iter
 
@@ -125,19 +135,44 @@ def create_game_nash_dataset(num_games: int = 100) -> Dataset:
     return MicroGameNashDataset(games=xs, nash_eqs=targets)
 
 
-def get_micro_iqnd_path(idx: int) -> str:
-    return f"dataset/quantum-training-datasets/micro-dataset-{idx}.pth"
+def construct_training_dataset() -> QuantumTrainingDataset:
+    env: MultiEnv = create_env()
+    player_tokens: Tensor = eye(env.num_players)
+    max_idx: int = compute_max_ds_idx(get_gn_path)
+    for idx in range(0, max_idx):
+        gn_ds: MicroGameNashDataset = load(get_gn_path(idx))
+        xs: List[Tuple[Tensor, Tensor, Tensor]] = list()
+        ys: List[Tensor] = list()
+        for game, solution in gn_ds:
+            for player in range(0, env.num_players):
+                x: Tuple[Tensor, Tensor, Tensor] = (env.reset(True), game, player_tokens[player])
+                y: Tensor = solution[player]
+                xs.append(x)
+                ys.append(y)
+        mqt_ds: MicroQuantumTrainingDataset = MicroQuantumTrainingDataset(xs, ys)
+        save(mqt_ds, get_mqt_path(idx))
+    qt_ds: QuantumTrainingDataset = QuantumTrainingDataset()
+    return qt_ds
+
+
+def get_mqt_path(idx: int) -> str:
+    return f"dataset/quantum-training-datasets/quantum-training-dataset-{idx}.pth"
 
 
 def get_gn_path(idx: int) -> str:
     return f"dataset/game-nash-datasets/game-nash-dataset-{idx}.pth"
 
 
+def split_dataset(ds: Dataset) -> Tuple[Dataset, Dataset, Dataset]:
+    ratio: List[float] = [0.8, 0.1, 0.1]
+    train_ds, val_ds, test_ds = random_split(dataset=ds, lengths=ratio)
+    return train_ds, val_ds, test_ds
+
+
 if __name__ == '__main__':
-    for i in range(compute_max_ds_idx(get_gn_path), 1000):
-        print(i)
-        mgn_ds = create_game_nash_dataset()
-        save(mgn_ds, get_gn_path(i))
+    qt_dataset = QuantumTrainingDataset(end=1.)
+    print(len(qt_dataset))
+    print("Done!")
 
 
 # torch.utils.data.random_split()
