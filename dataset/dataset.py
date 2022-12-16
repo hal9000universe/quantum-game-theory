@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, IterableDataset, random_split
 # lib
 from base.utils import create_env
 from base.multi_env import MultiEnv
-from base.nash import compute_nash_eq_b
+from base.nash import compute_nash_eq_b, is_nash
 
 
 # LazyDataset (instead of allocating self._iterable, load self._iterable from file!)
@@ -161,6 +161,27 @@ def get_mqt_path(idx: int) -> str:
 
 def get_gn_path(idx: int) -> str:
     return f"dataset/game-nash-datasets/game-nash-dataset-{idx}.pth"
+
+
+def check_dataset():
+    # Correct: 12493, Total: 12600, action_space._num_steps = 24
+    # Success rate: 12493 / 12600 = 0.9915079365079366.
+    gn_ds = GameNashDataset()
+    environment = create_env()
+
+    num_correct: int = 0
+    num_total: int = 0
+    for i, (game, nash) in enumerate(gn_ds):
+        environment.reward_distribution = game
+        check: bool = is_nash(list(nash), environment)
+        num_total += 1
+        if check:
+            num_correct += 1
+        print(i)
+        print(check)
+
+    print(f"Out of {num_total} games, {num_correct} were solved correctly.")
+    print(f"Success rate: {num_correct / num_total}")
 
 
 if __name__ == '__main__':

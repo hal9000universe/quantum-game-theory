@@ -130,13 +130,6 @@ def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
     return tensor(actions)
 
 
-def check(final_params: Tensor, solution: Tensor) -> bool:
-    learned: bool = allclose(final_params, solution,
-                             rtol=0.1,
-                             atol=0.1)
-    return learned
-
-
 def test_algorithm() -> float:
     # (Noisy Inputs) Success rate: 0.45
     # (Fixed Inputs) Success rate: 0.43

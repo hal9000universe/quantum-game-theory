@@ -9,3 +9,4 @@
 # TODO: translate checking is_nash to simplified algorithm
 # TODO: speed up algorithm by combining coarse region search with exact nash-equilibrium search
 # [dataset] create quantum-game dataset
+# [dataset] check dataset with is_nash and higher accuracy

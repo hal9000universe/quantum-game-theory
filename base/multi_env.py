@@ -35,11 +35,11 @@ class MultiEnv:
     _action_space: ActionSpace
     _ops: Ops
     _uniform: Distribution
+    _reward_sampler: Distribution
     _circuit: Callable
     _state: QuantumSystem
     _J: Operator
-    _J_adj: Operator
-    _nash_eq: Optional[List[Tuple[Tensor, ...]]]
+    _nash_eq: Optional[Tensor]
 
     def __init__(self, num_players: int):
         self._num_players = num_players
@@ -50,15 +50,14 @@ class MultiEnv:
         self.generate_random()
         self._state = QuantumSystem(self._num_players)
         self._J = self._ops.J.inject(self._num_players)
-        self._adj_J = self._J.adjoint
         self._nash_eq = None
 
     @property
-    def nash_eq(self) -> Optional[List[Tuple[Tensor, ...]]]:
+    def nash_eq(self) -> Optional[Tensor]:
         return self._nash_eq
 
     @nash_eq.setter
-    def nash_eq(self, nash_eq: Optional[List[Tuple[Tensor, ...]]]):
+    def nash_eq(self, nash_eq: Optional[Tensor]):
         self._nash_eq = nash_eq
 
     @property
@@ -90,7 +89,6 @@ class MultiEnv:
     @J.setter
     def J(self, operator: Operator):
         self._J = operator
-        self._adj_J = operator.adjoint
 
     @property
     def action_space(self) -> ActionSpace:
