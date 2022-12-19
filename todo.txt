@@ -6,7 +6,12 @@
 # [nash]: design nash-scanner
 # [plotting] implement NoisyActions Experiment
 # [multi_env] implement random symmetric game
-# TODO: translate checking is_nash to simplified algorithm
-# TODO: speed up algorithm by combining coarse region search with exact nash-equilibrium search
 # [dataset] create quantum-game dataset
 # [dataset] check dataset with is_nash and higher accuracy
+# TODO: test pretrained model on test dataset without fine-tuning
+# TODO: clean up experiments (imports from general.py > copied and modified code)
+# TODO: add security checks to multi_env (and change name to env)
+# TODO: change __call__ protocol to forward methods
+# TODO: investigate structure underlying quantum games (closer look at classes of nash equilibria)
+# TODO: torch.quantization using torch.fx
+# TODO: application of torch.script 
