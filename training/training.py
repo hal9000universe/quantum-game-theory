@@ -10,12 +10,12 @@ from torch.nn.modules import HuberLoss
 
 # lib
 from base.utils import create_env
-from base.multi_env import MultiEnv
+from base.env import Env
 from base.transformer import Transformer
 from dataset.dataset import QuantumTrainingDataset, MicroQuantumTrainingDataset
 
 
-def validate(val_ds: DataLoader, loss_function: Callable, agent: Transformer) -> Tensor:
+def validate(val_ds: DataLoader, loss_function: Callable[[Tensor, Tensor], Tensor], agent: Transformer) -> Tensor:
     val_losses: List[Tensor] = list()
     for x_batch, nash_batch in val_ds:
         action_batch: Tensor = agent(*x_batch)
@@ -25,7 +25,7 @@ def validate(val_ds: DataLoader, loss_function: Callable, agent: Transformer) ->
 
 
 def test(test_ds: QuantumTrainingDataset, agent: Transformer) -> Tensor:
-    loss_function: Callable = HuberLoss()
+    loss_function: Callable[[Tensor, Tensor], Tensor] = HuberLoss()
     test_losses: List[Tensor] = list()
     for x, nash in test_ds:
         action: Tensor = agent(*x)
@@ -39,7 +39,7 @@ def train(num_episodes: int,
           optimizer: Optimizer,
           train_ds: DataLoader,
           val_ds: DataLoader) -> Transformer:
-    loss_function: Callable = HuberLoss()
+    loss_function: Callable[[Tensor, Tensor], Tensor] = HuberLoss()
     for episode in range(1, num_episodes + 1):
         train_losses: List[Tensor] = list()
         for i, (x_batch, nash_batch) in enumerate(train_ds):
@@ -84,7 +84,7 @@ def get_next_model_path() -> str:
 
 def main():
     # create environment
-    env: MultiEnv = create_env()
+    env: Env = create_env()
     # define hyperparameters
     num_players: int = env.num_players
     num_actions: int = env.action_space.num_params
@@ -115,7 +115,7 @@ def main():
     qt_test_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.9, end=1.)
 
     # training
-    num_episodes: int = 15
+    num_episodes: int = 30
     agent = train(
         num_episodes=num_episodes,
         agent=agent,

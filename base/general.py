@@ -1,18 +1,17 @@
 # py
 from math import pi
-from typing import Tuple, List, Callable
+from typing import Tuple, List
 
 # nn & rl
-from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, allclose, load
+from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, load
 from torch.optim import Adam, Optimizer
+from torch.distributions import Distribution, Uniform
 
 # lib
 from base.quantum import Operator
-from base.multi_env import MultiEnv
+from base.env import Env
 from base.action_space import ActionSpace, RestrictedActionSpace
 from base.transformer import Transformer
-from dataset.dataset import GameNashDataset, MicroGameNashDataset
-from base.utils import calc_dist
 from training.training import get_max_idx, get_model_path
 
 
@@ -21,14 +20,18 @@ def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[L
 
 
 def train(episodes: int,
-          fix_inp: True,
+          fix_inp: bool,
           fix_inp_time: int,
+          noisy_actions: bool,
+          fix_actions_time: int,
           num_players: int,
           agents: List[Transformer],
           optimizers: List[Optimizer],
-          env: MultiEnv,
+          env: Env,
           reward_distribution: Tensor,
           player_tokens: Tensor) -> List[Transformer]:
+    # initialize noise distribution
+    uniform: Distribution = Uniform(-0.25, 0.25)
     # loop over episodes
     for step in range(1, episodes):
         # get state from environment
@@ -42,6 +45,8 @@ def train(episodes: int,
             actions: List[Tensor] = []
             for i, player in enumerate(players):
                 params: Tensor = player(state, reward_distribution, player_tokens[i])
+                if noisy_actions:
+                    params += uniform.sample(params.shape)
                 actions.append(params)
 
             # compute q-values
@@ -58,10 +63,16 @@ def train(episodes: int,
         if step == fix_inp_time:
             fix_inp = True
 
+        if step == fix_actions_time:
+            noisy_actions = False
+
     return agents
 
 
-def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
+def training_framework(reward_distribution: Tensor,
+                       load_model: bool = False,
+                       noisy_inputs: bool = True,
+                       noisy_actions: bool = False) -> Tensor:
     # define quantum game
     num_players: int = 2
     gamma: float = pi / 2
@@ -72,7 +83,7 @@ def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
     action_space: ActionSpace = RestrictedActionSpace()
 
     # initialize env
-    env: Env = MultiEnv(num_players=num_players)
+    env: Env = Env(num_players=num_players)
     env.J = J
     env.reward_distribution = reward_distribution
     env.action_space = action_space
@@ -96,8 +107,9 @@ def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
 
     # define hyperparameters
     episodes: int = 100
-    fix_inp: bool = True
+    fix_inp: bool = not noisy_inputs
     fix_inp_time: int = int(episodes * 0.6)
+    fix_actions_time: int = int(episodes * 0.6)
 
     # inputs
     reward_distribution: Tensor = env.reward_distribution
@@ -108,6 +120,8 @@ def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
         episodes=episodes,
         fix_inp=fix_inp,
         fix_inp_time=fix_inp_time,
+        noisy_actions=noisy_actions,
+        fix_actions_time=fix_actions_time,
         agents=agents,
         optimizers=optimizers,
         env=env,
@@ -116,51 +130,12 @@ def main(reward_distribution: Tensor, load_model: bool = False) -> Tensor:
         player_tokens=player_tokens,
     )
 
-    # monitoring
-    print('-----')
+    # return final actions
     state = env.reset(fix_inp=fix_inp)
     players, player_indices = static_order_players(num_players, agents)
     actions: List[Tuple[Tensor, ...]] = []
     for i, player in enumerate(players):
         params: Tensor = player(state, reward_distribution, player_tokens[i])
         actions.append(tuple(params))
-    qs = env.step(*actions)
-    print(f"Actions: {actions}")
-    print(f"Rewards: {qs}")
-    return tensor(actions)
-
-
-def test_algorithm() -> float:
-    # (Noisy Inputs) Success rate: 0.45
-    # (Fixed Inputs) Success rate: 0.43
-    # (Trained Model, Noisy Inputs) Success rate: 0.88
-    # (Trained Model, Fixed Inputs) Success rate: 0.87
-    ds = load("dataset/game-nash-datasets/game-nash-dataset-125.pth")
-    parametrization: Callable = RestrictedActionSpace().operator
-
-    num_games: int = len(ds)
-    num_successes: int = 0
-
-    for i, (reward_distribution, nash_eq) in enumerate(ds):
-        actions: Tensor = main(reward_distribution)
-        dist: Tensor = calc_dist(nash_eq, actions, parametrization)
-        if dist < 0.2:
-            num_successes += 1
-        print(f"Game: {i} - Dist: {dist} - Successes: {num_successes}")
-
-    return num_successes / num_games
-
-
-if __name__ == '__main__':
-    success_rate: float = test_algorithm()
-    print(f"Success rate: {success_rate}")
-
-
-# experiments
-# result (transformer, static_order): 1. success rate
-# result (transformer, only self-play): 0.55 success rate
-# result (transformer, random_order): 0.45 success rate
-
-# quantum games
-# reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])  # Prisoner's Dilemma
-# reward_distribution: Tensor = tensor([[6., 6.], [2., 8.], [8., 2.], [0., 0.]])  # Chicken's Dilemma
+    actions: Tensor = tensor(actions)
+    return actions

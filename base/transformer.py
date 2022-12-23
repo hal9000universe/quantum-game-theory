@@ -1,5 +1,5 @@
 # py
-from typing import List, Callable
+from typing import List
 from math import pi
 
 # nn & rl
@@ -22,6 +22,8 @@ POST: int = 64
 
 
 class StateEmbedding(Module):
+    _pre_mat: Tensor
+    _post_mat: Tensor
 
     def __init__(self, dims: int):
         super(StateEmbedding, self).__init__()
@@ -34,7 +36,7 @@ class StateEmbedding(Module):
         self._pre_mat = kaiming_normal_(self._pre_mat)
         self._post_mat = kaiming_normal_(self._post_mat)
 
-    def __call__(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         if len(x.shape) == 2:
             x = x.view(x.shape[0], 1, -1)
         elif len(x.shape) == 1:
@@ -64,7 +66,7 @@ class RewardEmbedding(Module):
         self._pre_mat = kaiming_normal_(self._pre_mat)
         self._post_mat = kaiming_normal_(self._post_mat)
 
-    def __call__(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         try:
             assert len(x.shape) == 3 or len(x.shape) == 2
         except AssertionError:
@@ -77,6 +79,8 @@ class RewardEmbedding(Module):
 
 
 class PlayerTokenEmbedding(Module):
+    _pre_mat: Tensor
+    _post_mat: Tensor
 
     def __init__(self, num_players):
         super(PlayerTokenEmbedding, self).__init__()
@@ -89,7 +93,7 @@ class PlayerTokenEmbedding(Module):
         self._pre_mat = kaiming_normal_(self._pre_mat)
         self._post_mat = kaiming_normal_(self._post_mat)
 
-    def __call__(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         if len(x.shape) == 2:
             x = x.view(x.shape[0], -1, 1)
         elif len(x.shape) == 1:
@@ -114,7 +118,7 @@ class Embedding(Module):
         self._reward_embedding = RewardEmbedding(num_players=num_players, dims=dims)
         self._player_token_embedding = PlayerTokenEmbedding(num_players=num_players)
 
-    def __call__(self, state: Tensor, rewards: Tensor, player_token: Tensor) -> Tensor:
+    def forward(self, state: Tensor, rewards: Tensor, player_token: Tensor) -> Tensor:
         embedded_state: Tensor = self._state_embedding(state)
         embedded_reward: Tensor = self._reward_embedding(rewards)
         embedded_player_token: Tensor = self._player_token_embedding(player_token)
@@ -160,33 +164,20 @@ class ClipContraction(Module):
         self._mins = mins
         self._maxs = maxs
 
-    def __call__(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         return clip(x, self._mins, self._maxs)
 
 
-class Sigmoid2Contraction(Module):
-    _scaling: Tensor
-
-    def __init__(self, scaling: Tensor):
-        super(Sigmoid2Contraction, self).__init__()
-        self._scaling = scaling
-
-    def __call__(self, x: Tensor) -> Tensor:
-        x = sigmoid(x)
-        x = self._scaling * x
-        return x
-
-
-class Sigmoid3Contraction(Module):
+class SigmoidContraction(Module):
     _scaling: Tensor
     _translating: Tensor
 
     def __init__(self, scaling: Tensor, translating: Tensor):
-        super(Sigmoid3Contraction, self).__init__()
+        super(SigmoidContraction, self).__init__()
         self._scaling = scaling
         self._translating = translating
 
-    def __call__(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         x = sigmoid(x)
         x = self._scaling * x + self._translating
         return x
@@ -218,14 +209,15 @@ class ParametrizationModule(Module):
         elif contraction_mode.is_sigmoid() and num_actions == 3:
             self._scaling = tensor([2 * pi, pi, 2 * pi], requires_grad=True)
             self._translating = tensor([-pi, 0., -pi], requires_grad=True)
-            self._contraction = Sigmoid3Contraction(self._scaling, self._translating)
+            self._contraction = SigmoidContraction(self._scaling, self._translating)
         elif contraction_mode.is_sigmoid() and num_actions == 2:
             self._scaling = tensor([pi, pi / 2], requires_grad=True)
-            self._contraction = Sigmoid2Contraction(self._scaling)
+            self._translating = zeros((2,), requires_grad=True)
+            self._contraction = SigmoidContraction(self._scaling, self._translating)
         else:
             raise UnwantedError("Parametrization module has wrong number of actions.")
 
-    def __call__(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         if len(x.shape) == 3:
             x = x.view(x.shape[0], -1)
         elif len(x.shape) == 2:
@@ -264,7 +256,7 @@ class Transformer(Module):
             contraction_mode=Mode().sigmoid_mode(),
         )
 
-    def __call__(self, state: Tensor, rewards: Tensor, player_token: Tensor) -> Tensor:
+    def forward(self, state: Tensor, rewards: Tensor, player_token: Tensor) -> Tensor:
         x: Tensor = self._embedding(state, rewards, player_token)
         for enc_layer in self._transformer_encoder_layers:
             x = enc_layer(x)

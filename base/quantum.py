@@ -1,5 +1,5 @@
 # nn & rl
-from torch import tensor, Tensor, zeros, complex64, eye, sqrt, kron, int64, matrix_exp, exp, sin, cos, cat
+from torch import tensor, Tensor, complex64, eye, kron, int64, matrix_exp, exp, sin, cos, cat
 from torch.distributions import Multinomial, Distribution
 from torch.nn.functional import one_hot
 
@@ -42,7 +42,7 @@ class QuantumSystem:
         self._state = value
 
     def __repr__(self) -> str:
-        return '{}'.format(self._state)
+        return f'{self._state}'
 
 
 class Operator:
@@ -52,7 +52,7 @@ class Operator:
         self._mat = mat
 
     def __matmul__(self, other: QuantumSystem) -> QuantumSystem:
-        qs = QuantumSystem(num_qubits=other.num_qubits)
+        qs: QuantumSystem = QuantumSystem(num_qubits=other.num_qubits)
         qs.state = self.mat @ other.state
         return qs
 
@@ -114,7 +114,7 @@ class RotX(Operator):
     @classmethod
     def inject(cls, theta: Tensor) -> Operator:
         exponent: Tensor = 1j / 2 * theta * PauliX().mat
-        rotx = matrix_exp(exponent)
+        rotx: Tensor = matrix_exp(exponent)
         return cls(rotx=rotx)
 
 
@@ -126,7 +126,7 @@ class RotY(Operator):
     @classmethod
     def inject(cls, theta: Tensor) -> Operator:
         exponent: Tensor = 1j / 2 * theta * PauliY().mat
-        roty = matrix_exp(exponent)
+        roty: Tensor = matrix_exp(exponent)
         return cls(rotx=roty)
 
 
@@ -138,7 +138,7 @@ class RotZ(Operator):
     @classmethod
     def inj(cls, theta: Tensor) -> Operator:
         exponent: Tensor = 1j / 2 * theta * PauliZ().mat
-        rotz = matrix_exp(exponent)
+        rotz: Tensor = matrix_exp(exponent)
         return cls(rotx=rotz)
 
 
@@ -153,7 +153,7 @@ class H(Operator):
 class CNOT(Operator):
 
     def __init__(self):
-        cnot = tensor([[1., 0., 0., 0.],
+        cnot: Tensor = tensor([[1., 0., 0., 0.],
                        [0., 1., 0., 0.],
                        [0., 0., 0., 1.],
                        [0., 0., 1., 0.]], dtype=complex64)

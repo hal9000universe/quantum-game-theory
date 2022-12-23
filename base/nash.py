@@ -1,20 +1,16 @@
 # py
 from typing import List, Optional, Tuple
 from copy import copy
-from math import pi
 from itertools import product
 
 # nn & rl
-from torch import Tensor, tensor, zeros
-from torch import complex64, kron, matrix_exp
+from torch import Tensor, tensor
 
 # lib
-from base.quantum import Operator
-from base.action_space import ActionSpace, RestrictedActionSpace, GeneralActionSpace
-from base.multi_env import MultiEnv
+from base.env import Env
 
 
-def is_nash(equilibrium: List, env: MultiEnv) -> bool:
+def is_nash(equilibrium: List, env: Env) -> bool:
     # for all players i, for all actions s_i' (Q(*equilibrium) >= Q(s_1, ..., s_i', ..., s_n))
     for i, action in enumerate(equilibrium):
         eq = copy(equilibrium)
@@ -27,7 +23,7 @@ def is_nash(equilibrium: List, env: MultiEnv) -> bool:
     return True
 
 
-def compute_nash_eq_b(env: MultiEnv) -> Optional[Tensor]:
+def compute_nash_eq_b(env: Env) -> Optional[Tensor]:
     action_space_grid: List[Tuple[Tensor, ...]] = []
     for action in env.action_space.iterator:
         action_space_grid.append(action)

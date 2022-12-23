@@ -1,27 +1,35 @@
 # py
-from typing import List, Tuple, Iterable
+from typing import List, Iterable
 from math import pi
 
 # nn & rl
-from torch import Tensor, linspace, exp, cos, sin, cat
+from torch import Tensor, tensor, linspace, exp, cos, sin, cat
 
 # lib
 from base.quantum import Ops
 
 
 class ActionSpace:
-    _ranges: List[Tuple[float, float]]
+    _ranges: Tensor
     _num_steps: int
     _num_params: int
     _ops: Ops
     _iterator: Iterable
 
-    def __init__(self, ranges: List[Tuple[float, float]]):
+    def __init__(self, ranges: Tensor):
         self._ranges = ranges
         self._num_steps = 8
         self._num_params = len(ranges)
         self._ops = Ops()
         self._iterator = self._generate_iterator()
+
+    @property
+    def mins(self) -> Tensor:
+        return self._ranges[:, 0]
+
+    @property
+    def maxs(self) -> Tensor:
+        return self._ranges[:, 1]
 
     def _generate_iterator(self) -> Iterable:
         params: List[Tensor] = []
@@ -61,8 +69,7 @@ class ActionSpace:
 class GeneralActionSpace(ActionSpace):
 
     def __init__(self):
-        # euler angle ranges: [-pi, pi], [0, pi], [-pi, pi]
-        ranges: List[Tuple[float, float]] = [(-pi, pi), (0., pi), (-pi, pi)]
+        ranges: Tensor = tensor([[-pi, pi], [0., pi], [-pi, pi]])
         super(GeneralActionSpace, self).__init__(ranges=ranges)
 
     def operator(self, params: Tensor) -> Tensor:
@@ -75,8 +82,7 @@ class GeneralActionSpace(ActionSpace):
 class RestrictedActionSpace(ActionSpace):
 
     def __init__(self):
-        # angle ranges given in Quantum Games and Quantum Strategies by Eisert et al.
-        ranges: List[Tuple[float, float]] = [(0., pi), (0., pi / 2)]
+        ranges: Tensor = tensor([[0., pi], [0., pi/2]])
         super(RestrictedActionSpace, self).__init__(ranges=ranges)
 
     def operator(self, params: Tensor) -> Tensor:

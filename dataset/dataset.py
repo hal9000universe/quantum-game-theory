@@ -6,19 +6,15 @@ from itertools import chain
 
 # nn & rl
 from torch import Tensor, eye, save, load
-from torch.utils.data import Dataset, IterableDataset, random_split
+from torch.utils.data import Dataset, IterableDataset
 
 # lib
 from base.utils import create_env
-from base.multi_env import MultiEnv
+from base.env import Env
 from base.nash import compute_nash_eq_b, is_nash
 
 
-# LazyDataset (instead of allocating self._iterable, load self._iterable from file!)
 class MicroQuantumTrainingDataset(IterableDataset, ABC):
-    """
-    Micro Iterable Quantum Nash-Equilibria Dataset
-    """
     _iterable: List[Tuple[Tuple[Tensor, Tensor, Tensor], Tensor]]
 
     def __init__(self, xs: List[Tuple[Tensor, Tensor, Tensor]], targets: List[Tensor]):
@@ -97,7 +93,7 @@ class GameNashDataset(IterableDataset, ABC):
         return size
 
 
-def compute_max_ds_idx(fun: Callable) -> int:
+def compute_max_ds_idx(fun: Callable[[int], str]) -> int:
     ds_exists: bool = True
     max_ds_idx: int = 0
     while ds_exists:
@@ -111,7 +107,7 @@ def compute_max_ds_idx(fun: Callable) -> int:
 
 
 def create_game_nash_dataset(num_games: int = 100) -> Dataset:
-    env: MultiEnv = create_env()
+    env: Env = create_env()
     # storage
     xs: List[Tuple[Tensor, Tensor, Tensor]] = list()
     targets: List[Tensor] = list()
@@ -136,7 +132,7 @@ def create_game_nash_dataset(num_games: int = 100) -> Dataset:
 
 
 def construct_training_dataset() -> QuantumTrainingDataset:
-    env: MultiEnv = create_env()
+    env: Env = create_env()
     player_tokens: Tensor = eye(env.num_players)
     max_idx: int = compute_max_ds_idx(get_gn_path)
     for idx in range(0, max_idx):
@@ -177,17 +173,11 @@ def check_dataset():
         num_total += 1
         if check:
             num_correct += 1
-        print(i)
-        print(check)
+        print(f"Game {i}: {check}")
 
     print(f"Out of {num_total} games, {num_correct} were solved correctly.")
     print(f"Success rate: {num_correct / num_total}")
 
 
 if __name__ == '__main__':
-    qt_dataset = QuantumTrainingDataset()
-    print(len(qt_dataset))
-    print("Done!")
-
-
-# torch.utils.data.random_split()
+    check_dataset()
