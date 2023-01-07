@@ -41,6 +41,23 @@ def perform_grad_desc(env: Env,
     return row_stack(tuple(players_params))
 
 
+# 0.46
+def test_prisoners_grad_desc() -> float:
+    num_successes: int = 0
+    env: Env = create_env()
+    nash_eq: Tensor = tensor([[0., pi / 2], [0., pi / 2]])
+
+    for attempt in range(0, 100):
+        actions: Tensor = perform_grad_desc(env, 4000)
+        dist: float = calc_dist(nash_eq, actions, env.action_space.operator)
+        if dist < 0.2:
+            num_successes += 1
+        print(f"Attempt: {attempt} - Dist: {dist} - Successes: {num_successes}")
+
+    return num_successes / 100
+
+
+# 0.15
 def test_grad_desc() -> float:
     ds = load("dataset/game-nash-datasets/game-nash-dataset-125.pth")
     parametrization: Callable[[Tensor], Tensor] = RestrictedActionSpace().operator
@@ -62,6 +79,7 @@ def test_grad_desc() -> float:
 
 
 if __name__ == '__main__':
-    # result: 0.15 success rate
-    accuracy: float = test_grad_desc()
-    print(f"Accuracy: {accuracy}")
+    prisoners_accuracy: float = test_prisoners_grad_desc()
+    general_accuracy: float = test_grad_desc()
+    print(f"Prisoner's Accuracy: {prisoners_accuracy}")
+    print(f"General Accuracy: {general_accuracy}")
