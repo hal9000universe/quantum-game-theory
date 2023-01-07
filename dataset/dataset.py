@@ -75,20 +75,10 @@ class MicroGameNashDataset(IterableDataset, ABC):
 class GameNashDataset(IterableDataset, ABC):
     _iterable: List[MicroGameNashDataset]
 
-    def __init__(self, start: Optional[int | float] = None, end: Optional[int | float] = None):
+    def __init__(self):
         max_ds_idx: int = compute_max_ds_idx(get_gn_path)
         ds_iter: List[IterableDataset] = list()
-        if not start:
-            start = 0
-        if not end:
-            end = max_ds_idx
-        if isinstance(start, float):
-            assert start < 1.
-            start: int = (max_ds_idx * start).__int__()
-        if isinstance(end, float):
-            assert end <= 1.
-            end: int = (max_ds_idx * end).__int__()
-        for idx in range(start, end):
+        for idx in range(0, max_ds_idx):
             ds: IterableDataset = load(get_gn_path(idx))
             ds_iter.append(ds)
         self._iterable = ds_iter

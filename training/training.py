@@ -54,7 +54,7 @@ def train(num_episodes: int,
                 mean_val_loss: Tensor = validate(val_ds, loss_function, agent)
                 mean_train_loss: Tensor = tensor(train_losses).mean(0)
                 print(f"Episode: {episode} - Train Loss: {mean_train_loss} - Validation Loss: {mean_val_loss}")
-        if episode % 1 == 0:
+        if episode % 5 == 0:
             # save model
             save_path: str = get_next_model_path()
             save(agent, save_path)
@@ -115,7 +115,7 @@ def main():
     qt_test_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.9, end=1.)
 
     # training
-    num_episodes: int = 40
+    num_episodes: int = 30
     agent = train(
         num_episodes=num_episodes,
         agent=agent,
