@@ -1,3 +1,6 @@
+# py
+from math import pi
+
 # nn & rl
 from torch import tensor, Tensor, complex64, eye, kron, int64, matrix_exp, exp, sin, cos, cat
 from torch.distributions import Multinomial, Distribution
@@ -136,7 +139,7 @@ class RotZ(Operator):
         super(RotZ, self).__init__(mat=rotx)
 
     @classmethod
-    def inj(cls, theta: Tensor) -> Operator:
+    def inject(cls, theta: Tensor) -> Operator:
         exponent: Tensor = 1j / 2 * theta * PauliZ().mat
         rotz: Tensor = matrix_exp(exponent)
         return cls(rotx=rotz)
@@ -154,22 +157,35 @@ class CNOT(Operator):
 
     def __init__(self):
         cnot: Tensor = tensor([[1., 0., 0., 0.],
-                       [0., 1., 0., 0.],
-                       [0., 0., 0., 1.],
-                       [0., 0., 1., 0.]], dtype=complex64)
+                               [0., 1., 0., 0.],
+                               [0., 0., 0., 1.],
+                               [0., 0., 1., 0.]], dtype=complex64)
         super(CNOT, self).__init__(mat=cnot)
 
 
-class J(Operator):
+class GeneralJ(Operator):
 
     def __init__(self, num_players: int = 2):
         prep: Tensor = 1 / tensor(2.).sqrt() * (
-                    tens_pow(num_players, I().mat) + 1j * tens_pow(num_players, PauliX().mat))
-        super(J, self).__init__(mat=prep)
+                tens_pow(num_players, I().mat) + 1j * tens_pow(num_players, PauliX().mat))
+        super(GeneralJ, self).__init__(mat=prep)
 
     @classmethod
     def inject(cls, num_players: int) -> Operator:
         return cls(num_players=num_players)
+
+
+class J(Operator):
+
+    def __init__(self, gamma: float = pi / 2):
+        D: Tensor = tensor([[0., 1.],
+                            [-1., 0.]], dtype=complex64)
+        J_mat = matrix_exp(-1j * gamma * kron(D, D) / 2)
+        super(J, self).__init__(mat=J_mat)
+
+    @classmethod
+    def inject(cls, gamma: float) -> Operator:
+        return cls(gamma)
 
 
 class U(Operator):
@@ -179,7 +195,7 @@ class U(Operator):
         super(U, self).__init__(mat=mat)
 
     @classmethod
-    def inj(cls, theta: Tensor, phi: Tensor, psi: Tensor) -> Operator:
+    def inject(cls, theta: Tensor, phi: Tensor, psi: Tensor) -> Operator:
         a: Tensor = cos(theta / 2)
         b: Tensor = sin(theta / 2)
         c: Tensor = -exp(1j * psi)
@@ -200,7 +216,7 @@ class Ops:
     _sz: PauliZ
     _H: H
     _CNOT: CNOT
-    _J: J
+    _J: GeneralJ
     _RotX: RotX
     _RotY: RotY
     _RotZ: RotZ
@@ -213,6 +229,7 @@ class Ops:
         self._sz = PauliZ()
         self._H = H()
         self._CNOT = CNOT()
+        self._GeneralJ = GeneralJ()
         self._J = J()
         self._RotX = RotX()
         self._RotY = RotY()
@@ -244,7 +261,11 @@ class Ops:
         return self._CNOT
 
     @property
-    def J(self) -> J:
+    def GeneralJ(self) -> GeneralJ:
+        return self._GeneralJ
+
+    @property
+    def J(self):
         return self._J
 
     @property

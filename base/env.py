@@ -16,7 +16,7 @@ from base.quantum import QuantumSystem, Ops, Operator
 def create_circuit(num_players: int) -> Callable[[Tuple[Tensor, ...]], Tensor]:
     dev: Device = device('default.qubit', wires=num_players)
     all_wires: List[int] = [i for i in range(0, num_players)]
-    J: Tensor = Ops().J.inject(num_players).mat
+    J: Tensor = Ops().J
 
     @qnode(device=dev, interface='torch')
     def circuit(*operators: Tuple[Tensor, ...]) -> Tensor:
@@ -45,12 +45,15 @@ class Env:
         self._num_players = num_players
         self._action_space = GeneralActionSpace()
         self._ops = Ops()
-        self._uniform = Uniform(-0.25, 0.25)
-        self._circuit = create_circuit(num_players)
+        self._uniform = Uniform(-0.2, 0.2)
         self.generate_random()
         self._state = QuantumSystem(self._num_players)
-        self._J = self._ops.J.inject(self._num_players)
+        self._J = self._ops.GeneralJ.inject(self._num_players)
         self._nash_eq = None
+        self._make_circuit()
+
+    def _make_circuit(self):
+        self._circuit = create_circuit(self._num_players)
 
     @property
     def nash_eq(self) -> Optional[Tensor]:

@@ -76,7 +76,7 @@ class GeneralActionSpace(ActionSpace):
         """
         computes and returns a complex rotation matrix given by the Euler angles in params.
         """
-        return self._ops.U.inj(*params).mat
+        return self._ops.U.inject(*params).mat
 
 
 class RestrictedActionSpace(ActionSpace):
