@@ -34,13 +34,23 @@ def test(test_ds: QuantumTrainingDataset, agent: Transformer) -> Tensor:
     return tensor(test_losses).mean(0)
 
 
-def train(num_episodes: int,
+def train(num_epochs: int,
           agent: Transformer,
           optimizer: Optimizer,
           train_ds: DataLoader,
           val_ds: DataLoader) -> Transformer:
+
+    # initialize huber loss function
     loss_function: Callable[[Tensor, Tensor], Tensor] = HuberLoss()
-    for episode in range(1, num_episodes + 1):
+
+    # loop over epochs
+    for epoch in range(1, num_epochs + 1):
+
+        # save model
+        if epoch % 1 == 0:
+            save_path: str = get_next_model_path()
+            save(agent, save_path)
+
         train_losses: List[Tensor] = list()
         for i, (x_batch, nash_batch) in enumerate(train_ds):
             action_batch: Tensor = agent(*x_batch)
@@ -49,15 +59,14 @@ def train(num_episodes: int,
             loss.backward()
             optimizer.step()
             train_losses.append(loss)
+
+            # monitoring
             if i % 50 == 0:
-                # monitoring
                 mean_val_loss: Tensor = validate(val_ds, loss_function, agent)
                 mean_train_loss: Tensor = tensor(train_losses).mean(0)
-                print(f"Episode: {episode} - Train Loss: {mean_train_loss} - Validation Loss: {mean_val_loss}")
-        if episode % 5 == 0:
-            # save model
-            save_path: str = get_next_model_path()
-            save(agent, save_path)
+                print(f"Episode: {epoch} - Train Loss: {mean_train_loss} - Validation Loss: {mean_val_loss}")
+
+    # return trained agent
     return agent
 
 
@@ -115,9 +124,9 @@ def main():
     qt_test_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.9, end=1.)
 
     # training
-    num_episodes: int = 30
+    num_epochs: int = 40
     agent = train(
-        num_episodes=num_episodes,
+        num_epochs=num_epochs,
         agent=agent,
         optimizer=adam,
         train_ds=train_data_loader,

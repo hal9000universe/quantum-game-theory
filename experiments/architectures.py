@@ -25,23 +25,18 @@ from tikzplotlib import save
 
 def track_algorithm(model: type = Transformer):
     # define variables
-    ds: GameNashDataset = GameNashDataset(start=0.999, end=1.0)
-    num_games: int = len(ds)
+    num_experiments: int = 100
     episodes: int = 15
     plot_frequency: int = 1
-    distances: Tensor = zeros((num_games, episodes // plot_frequency))
+    distances: Tensor = zeros((num_experiments, episodes // plot_frequency))
 
     # training framework
     noisy_inputs: bool = False
     noisy_actions: bool = False
 
     nash_eq: Tensor = tensor([[0., pi / 2], [0., pi / 2]])
-    for game in range(0, num_games):
+    for game in range(0, num_experiments):
         reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
-
-        # TODO
-        if game > 10:
-            break
 
         # define quantum game
         env: Env = create_env()
