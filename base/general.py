@@ -4,6 +4,7 @@ from typing import Tuple, List
 
 # nn & rl
 from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, load
+from torch.nn import Module
 from torch.optim import Adam, Optimizer
 from torch.distributions import Distribution, Uniform
 
@@ -12,10 +13,11 @@ from base.quantum import Operator
 from base.env import Env
 from base.action_space import ActionSpace, RestrictedActionSpace
 from base.transformer import Transformer
+from base.utils import create_env
 from training.training import get_max_idx, get_model_path
 
 
-def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
+def static_order_players(num_players: int, agents: List[Module]) -> Tuple[List[Module], List[int]]:
     return agents[0:num_players], [i for i in range(0, num_players)]
 
 
@@ -25,13 +27,14 @@ def train(episodes: int,
           noisy_actions: bool,
           fix_actions_time: int,
           num_players: int,
-          agents: List[Transformer],
+          agents: List[Module],
           optimizers: List[Optimizer],
           env: Env,
           reward_distribution: Tensor,
-          player_tokens: Tensor) -> List[Transformer]:
+          player_tokens: Tensor,
+          nisq: bool = False) -> List[Module]:
     # initialize noise distribution
-    uniform: Distribution = Uniform(-0.25, 0.25)
+    uniform: Distribution = Uniform(-0.2, 0.2)
     # loop over episodes
     for step in range(1, episodes):
         # get state from environment
@@ -50,7 +53,10 @@ def train(episodes: int,
                 actions.append(params)
 
             # compute q-values
-            qs = env.step(*actions)
+            if nisq:
+                qs: List[Tensor] = env.q_step(*actions)
+            else:
+                qs: List[Tensor] = env.step(*actions)
 
             # define loss
             loss_idx: Tensor = -qs[player_idx]
@@ -74,19 +80,9 @@ def training_framework(reward_distribution: Tensor,
                        noisy_inputs: bool = True,
                        noisy_actions: bool = False) -> Tensor:
     # define quantum game
-    num_players: int = 2
-    gamma: float = pi / 2
-    D: Tensor = tensor([[0., 1.],
-                        [-1., 0.]], dtype=complex64)
-    mat: Tensor = matrix_exp(-1j * gamma * kron(D, D) / 2)
-    J: Operator = Operator(mat=mat)
-    action_space: ActionSpace = RestrictedActionSpace()
-
-    # initialize env
-    env: Env = Env(num_players=num_players)
-    env.J = J
+    env: Env = create_env()
     env.reward_distribution = reward_distribution
-    env.action_space = action_space
+    num_players: int = env.num_players
 
     # define and initialize agents
     num_encoder_layers: int = 2
