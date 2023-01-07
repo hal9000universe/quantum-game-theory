@@ -12,18 +12,18 @@ from torch.distributions import Uniform, Distribution
 from base.transformer import Transformer
 from base.env import Env
 from base.general import static_order_players
-from base.utils import calc_dist, create_env, compute_oriented_std
+from base.utils import calc_dist, create_env, compute_oriented_std, compute_relu_std
 from dataset.dataset import GameNashDataset, MicroGameNashDataset
 from training.training import get_model_path, get_max_idx
 from experiments.complex_network import ComplexNetwork
 
 # plotting
-from matplotlib.pyplot import scatter, plot, errorbar, xlabel, ylabel, show
+from matplotlib.pyplot import subplots, errorbar, xlabel, ylabel, show, setp
 from numpy import ndarray, linspace
 from tikzplotlib import save
 
 
-def track_algorithm(model: type = Transformer, nisq: bool = False):
+def track_algorithm(model: type = Transformer):
     # define variables
     ds: GameNashDataset = GameNashDataset(start=0.999, end=1.0)
     num_games: int = len(ds)
@@ -35,11 +35,9 @@ def track_algorithm(model: type = Transformer, nisq: bool = False):
     noisy_inputs: bool = False
     noisy_actions: bool = False
 
-    # nash_eq: Tensor = tensor([[0., pi / 2], [0., pi / 2]])
-    #     for game in range(0, num_games):
-    #         reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
-
-    for game, (reward_distribution, nash_eq) in enumerate(ds):
+    nash_eq: Tensor = tensor([[0., pi / 2], [0., pi / 2]])
+    for game in range(0, num_games):
+        reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
 
         # TODO
         if game > 10:
@@ -101,10 +99,7 @@ def track_algorithm(model: type = Transformer, nisq: bool = False):
                     actions.append(params)
 
                 # compute q-values
-                if nisq:
-                    qs: List[Tensor] = env.q_step(*actions)
-                else:
-                    qs: List[Tensor] = env.step(*actions)
+                qs: List[Tensor] = env.step(*actions)
 
                 # define loss
                 loss_idx: Tensor = -qs[player_idx]
@@ -136,30 +131,41 @@ def track_algorithm(model: type = Transformer, nisq: bool = False):
     # compute plotting data
     x: ndarray = plot_frequency * linspace(0, distances.shape[1] - 1, distances.shape[1])
     y: ndarray = distances.mean(0).numpy()
-    stand_dev: ndarray = compute_oriented_std(distances)
+    # stand_dev: ndarray = compute_oriented_std(distances, 0)
+    stand_dev: ndarray = compute_relu_std(distances)
 
-    # plot data
-    errorbar(x, y, yerr=stand_dev, color='blue', ecolor='black', elinewidth=2, capsize=2., fmt='.k')
-    # scatter(x, y, c="rebeccapurple")
-    # scatter(x, mins, c="darkmagenta")
-    # scatter(x, maxs, c="midnightblue")
-    xlabel("Episoden")
-    ylabel("Distanz zum Nash-Gleichgewicht")
+    return x, y, stand_dev
+
+
+def make_plots():
+    # set up plot
+    nrows: int = 1
+    ncols: int = 2
+    fig, axs = subplots(nrows, ncols)
+    fig.set_figheight(5.)
+    fig.set_figwidth(12.)
+
+    # generate data
+    x_cn, y_cn, std_cn = track_algorithm(model=ComplexNetwork)
+    x_tr, y_tr, std_tr = track_algorithm(model=Transformer)
+
+    # plot success rate data
+    axs[0].errorbar(x_cn, y_cn, yerr=std_cn, color='blue', ecolor='black', elinewidth=2, capsize=2., fmt='.k')
+    axs[0].set_title("Distanz zum Nash-Gleichgewicht")
+
+    # plot performance data
+    axs[1].errorbar(x_tr, y_tr, yerr=std_tr, color='blue', ecolor='black', elinewidth=2, capsize=2., fmt='.k')
+    axs[1].set_title("Distanz zum Nash-Gleichgewicht")
+
+    # label axes
+    setp(axs, xlabel="Episoden")
+    setp(axs[0], ylabel="d(s, s')")
+    setp(axs[1], ylabel="d(s, s')")
+
     show()
 
-    # save tikz document
-    file: str
-    if model == Transformer and nisq:
-        file = "experiments/plots/nisq-transformer.tex"
-    elif model == Transformer:
-        file = "experiments/plots/transformer.tex"
-    elif model == ComplexNetwork and nisq:
-        file = "experiments/plots/nisq-complex-network.tex"
-    else:
-        file = "experiments/plots/complex-network.tex"
-    save(file)
+    save("experiments/plots/architectures.tex")
 
 
 if __name__ == '__main__':
-    track_algorithm(model=ComplexNetwork, nisq=False)
-    track_algorithm(model=Transformer, nisq=False)
+    make_plots()

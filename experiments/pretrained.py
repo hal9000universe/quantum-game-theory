@@ -8,7 +8,7 @@ from torch.utils.data import IterableDataset
 
 # lib
 from training.training import get_max_idx, get_model_path
-from dataset.dataset import MicroQuantumTrainingDataset, get_mqt_path, compute_max_ds_idx
+from dataset.dataset import QuantumTrainingDataset, MicroQuantumTrainingDataset, get_mqt_path, compute_max_ds_idx
 from base.utils import calc_dist
 from base.action_space import RestrictedActionSpace
 
@@ -23,7 +23,7 @@ def test_pretrained_model(model: Optional[Module] = None, monitoring: bool = Fal
     if model is None:
         model = load(get_model_path(get_max_idx()))
     parametrization: Callable[[Tensor], Tensor] = RestrictedActionSpace().operator
-    qt_ds: IterableDataset = load(get_mqt_path(compute_max_ds_idx(get_mqt_path) - 1))
+    qt_ds: IterableDataset = load(get_mqt_path(124))
     num_successes: int = 0
     num_games: int = 0
     nash_eq: Tensor = zeros((2, 2))
@@ -45,7 +45,7 @@ def compute_performance(model: Optional[Module] = None, monitoring: bool = False
     if model is None:
         model = load(get_model_path(get_max_idx()))
     parametrization: Callable[[Tensor], Tensor] = RestrictedActionSpace().operator
-    qt_ds: IterableDataset = load(get_mqt_path(compute_max_ds_idx(get_mqt_path) - 1))
+    qt_ds: IterableDataset = load(get_mqt_path(124))
     num_games: int = len(qt_ds)
     distances: Tensor = zeros((num_games,))
     nash_eq: Tensor = zeros((2, 2))
@@ -78,19 +78,17 @@ def compute_pretrained_success_rate_data(monitoring: bool = False) -> Tuple[ndar
 
 def compute_pretrained_performance_data(monitoring: bool = False) -> Tuple[ndarray, ndarray]:
     max_idx: int = get_max_idx()
-    print(max_idx)
-    mean_distances: Tensor = zeros((max_idx + 1, 200))
-    print(mean_distances)
+    mean_distances: Tensor = zeros((max_idx + 1,))
     for idx in range(0, max_idx + 1):
         model = load(get_model_path(idx))
         # compute average distance to nash equilibria
-        mean_distances[idx]: float = compute_performance(model)
+        mean_distances[idx]: float = compute_performance(model).mean()
         if monitoring:
-            print(mean_distances[idx].mean().detach())
+            print(mean_distances[idx].detach())
 
     # return ndarray
     x: ndarray = linspace(0, max_idx, max_idx + 1)
-    y: ndarray = mean_distances.mean(1).detach().numpy()
+    y: ndarray = mean_distances.detach().numpy()
     return x, y
 
 
@@ -103,20 +101,21 @@ def make_plots():
     fig.set_figwidth(12.)
 
     # generate data
-    x_success_rate, y_success_rate = compute_pretrained_success_rate_data()
-    x_performance, y_performance = compute_pretrained_performance_data()
-
-    print(x_success_rate, y_success_rate)
+    x_performance, y_performance = compute_pretrained_performance_data(True)
+    print("Performance Evaluation Done.")
+    x_success_rate, y_success_rate = compute_pretrained_success_rate_data(True)
+    print("Success Rate Evaluation Done.")
 
     # plot success rate data
     axs[0].plot(x_success_rate, y_success_rate)
     axs[0].set_title("Performanz")
+
     # plot performance data
     axs[1].plot(x_performance, y_performance)
     axs[1].set_title("Distanz zum Nash-Gleichgewicht")
 
     # label axes
-    setp(axs, xlabel="Episoden")
+    setp(axs, xlabel="Epochen")
     setp(axs[0], ylabel="Erfolgsrate")
     setp(axs[1], ylabel="d(s, s')")
 
