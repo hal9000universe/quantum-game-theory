@@ -1,5 +1,5 @@
 # py
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 # nn & rl
 from torch import Tensor, load, zeros, relu
@@ -14,7 +14,7 @@ from base.action_space import RestrictedActionSpace
 
 # plotting
 from numpy import ndarray, linspace
-from matplotlib.pyplot import plot, show, errorbar
+from matplotlib.pyplot import plot, show, subplots, setp
 from tikzplotlib import save
 
 
@@ -60,44 +60,70 @@ def compute_performance(model: Optional[Module] = None, monitoring: bool = False
     return distances
 
 
-def plot_pretrained_success_rate():
+def compute_pretrained_success_rate_data(monitoring: bool = False) -> Tuple[ndarray, ndarray]:
     max_idx: int = get_max_idx()
     rates: Tensor = zeros((max_idx + 1,))
     for idx in range(0, max_idx + 1):
         model = load(get_model_path(idx))
         # test model
         rates[idx]: float = test_pretrained_model(model)
-        print(rates[idx])
+        if monitoring:
+            print(rates[idx])
 
-    # plot data
+    # return ndarrays
     x: ndarray = linspace(0, max_idx, max_idx + 1)
     y: ndarray = rates.numpy()
-    plot(x, y, c="b")
-    show()
-
-    # save plot
-    save("experiments/plots/pretrained-success-rate.tex")
+    return x, y
 
 
-def plot_pretrained_performance():
+def compute_pretrained_performance_data(monitoring: bool = False) -> Tuple[ndarray, ndarray]:
     max_idx: int = get_max_idx()
+    print(max_idx)
     mean_distances: Tensor = zeros((max_idx + 1, 200))
+    print(mean_distances)
     for idx in range(0, max_idx + 1):
         model = load(get_model_path(idx))
         # compute average distance to nash equilibria
         mean_distances[idx]: float = compute_performance(model)
-        print(mean_distances[idx].mean().detach())
+        if monitoring:
+            print(mean_distances[idx].mean().detach())
 
-    # plot data
+    # return ndarray
     x: ndarray = linspace(0, max_idx, max_idx + 1)
     y: ndarray = mean_distances.mean(1).detach().numpy()
-    plot(x, y, c="b")
+    return x, y
+
+
+def make_plots():
+    # set up plot
+    nrows: int = 1
+    ncols: int = 2
+    fig, axs = subplots(nrows, ncols)
+    fig.set_figheight(5.)
+    fig.set_figwidth(12.)
+
+    # generate data
+    x_success_rate, y_success_rate = compute_pretrained_success_rate_data()
+    x_performance, y_performance = compute_pretrained_performance_data()
+
+    print(x_success_rate, y_success_rate)
+
+    # plot success rate data
+    axs[0].plot(x_success_rate, y_success_rate)
+    axs[0].set_title("Performanz")
+    # plot performance data
+    axs[1].plot(x_performance, y_performance)
+    axs[1].set_title("Distanz zum Nash-Gleichgewicht")
+
+    # label axes
+    setp(axs, xlabel="Episoden")
+    setp(axs[0], ylabel="Erfolgsrate")
+    setp(axs[1], ylabel="d(s, s')")
+
     show()
 
-    # save plot
-    save("experiments/plots/pretrained-performance.tex")
+    save("experiments/plots/pretrained.tex")
 
 
 if __name__ == '__main__':
-    plot_pretrained_performance()
-    plot_pretrained_success_rate()
+    make_plots()
