@@ -12,12 +12,12 @@ from base.utils import calc_dist, create_env
 from base.general import training_framework, train, static_order_players
 from base.action_space import RestrictedActionSpace
 from base.env import Env
-from dataset.dataset import MicroGameNashDataset
-from experiments.complex_network import ComplexNetwork
+from dataset.dataset import MicroGameNashDataset, GameNashDataset
+from experiments.prisoners_dilemma import ComplexNetwork
 
 
 def test_complex_network() -> float:
-    ds: MicroGameNashDataset = load("dataset/game-nash-datasets/game-nash-dataset-125.pth")
+    ds: MicroGameNashDataset = GameNashDataset(0.9, 1.0)
     parametrization: Callable[[Tensor], Tensor] = RestrictedActionSpace().operator
 
     # define counting variables
@@ -70,7 +70,7 @@ def test_complex_network() -> float:
 
 
 def test_transformer(load_model: bool = False, noisy_inputs: bool = False, noisy_actions: bool = False) -> float:
-    ds: MicroGameNashDataset = load("dataset/game-nash-datasets/game-nash-dataset-125.pth")
+    ds: MicroGameNashDataset = GameNashDataset(0.9, 1.0)
     parametrization: Callable[[Tensor], Tensor] = RestrictedActionSpace().operator
 
     num_games: int = len(ds)
@@ -91,77 +91,8 @@ def test_transformer(load_model: bool = False, noisy_inputs: bool = False, noisy
     return num_successes / num_games
 
 
-def complex_network_test():
-    # Success rate: 0.05
-    accuracy: float = test_complex_network()
-    print(f"Complex Network Accuracy: {accuracy}")
-
-
-def no_exploration_test():
-    # Success rate: 0.43 - 0.46
-    accuracy: float = test_transformer(
-        load_model=False,
-        noisy_inputs=False,
-        noisy_actions=False,
-    )
-    print(f"No Exploration Accuracy: {accuracy}")
-
-
-def pretrained_no_exploration_test():
-    # Success rate: 0.82 - 0.87
-    accuracy: float = test_transformer(
-        load_model=True,
-        noisy_inputs=False,
-        noisy_actions=False,
-    )
-    print(f"Pretrained No Exploration Accuracy: {accuracy}")
-
-
-def noisy_inputs_test():
-    # Success rate: 0.43 - 0.45
-    accuracy: float = test_transformer(
-        load_model=False,
-        noisy_inputs=True,
-        noisy_actions=False,
-    )
-    print(f"Noisy Inputs Accuracy: {accuracy}")
-
-
-def pretrained_noisy_inputs_test():
-    # Success rate: 0.85 - 0.88
-    accuracy: float = test_transformer(
-        load_model=True,
-        noisy_inputs=True,
-        noisy_actions=False,
-    )
-    print(f"Pretrained Noisy Inputs Accuracy: {accuracy}")
-
-
-def noisy_actions_test():
-    # Success rate: 0.41 - 0.47
-    accuracy: float = test_transformer(
-        load_model=False,
-        noisy_inputs=False,
-        noisy_actions=True,
-    )
-    print(f"Noisy Actions Accuracy: {accuracy}")
-
-
-def pretrained_noisy_actions_test():
-    # Success rate: 0.88 - 0.89
-    accuracy: float = test_transformer(
-        load_model=True,
-        noisy_inputs=False,
-        noisy_actions=True,
-    )
-    print(f"Pretrained Noisy Actions Accuracy: {accuracy}")
-
-
 if __name__ == '__main__':
-    complex_network_test()
-    no_exploration_test()
-    pretrained_no_exploration_test()
-    noisy_inputs_test()
-    pretrained_noisy_inputs_test()
-    noisy_actions_test()
-    pretrained_noisy_actions_test()
+    complex_network_success: float = test_complex_network()
+    transformer_success: float = test_transformer()
+    print(f"ComplexNetwork: {complex_network_success}")
+    print(f"Transformer: {transformer_success}")

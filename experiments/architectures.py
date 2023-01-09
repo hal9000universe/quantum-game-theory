@@ -15,7 +15,7 @@ from base.general import static_order_players
 from base.utils import calc_dist, create_env, compute_oriented_std, compute_relu_std
 from dataset.dataset import GameNashDataset, MicroGameNashDataset
 from training.training import get_model_path, get_max_idx
-from experiments.complex_network import ComplexNetwork
+from experiments.prisoners_dilemma import ComplexNetwork
 
 # plotting
 from matplotlib.pyplot import subplots, errorbar, xlabel, ylabel, show, setp
@@ -25,7 +25,7 @@ from tikzplotlib import save
 
 def track_algorithm(model: type = Transformer):
     # define variables
-    num_experiments: int = 100
+    num_experiments: int = 300
     episodes: int = 15
     plot_frequency: int = 1
     distances: Tensor = zeros((num_experiments, episodes // plot_frequency))
@@ -157,7 +157,7 @@ def make_plots():
     setp(axs[0], ylabel="d(s, s')")
     setp(axs[1], ylabel="d(s, s')")
 
-    show()
+    # show()
 
     save("experiments/plots/architectures.tex")
 

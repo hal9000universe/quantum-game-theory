@@ -2,7 +2,7 @@
 from typing import Callable, Optional, Tuple
 
 # nn & rl
-from torch import Tensor, load, zeros, relu
+from torch import Tensor, load, zeros
 from torch.nn import Module
 from torch.utils.data import IterableDataset
 
@@ -119,10 +119,11 @@ def make_plots():
     setp(axs[0], ylabel="Erfolgsrate")
     setp(axs[1], ylabel="d(s, s')")
 
-    show()
+    # show()
 
     save("experiments/plots/pretrained.tex")
 
 
 if __name__ == '__main__':
-    make_plots()
+    accuracy: float = test_pretrained_model()
+    print(f"Accuracy: {accuracy}")
