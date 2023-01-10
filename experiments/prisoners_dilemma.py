@@ -19,6 +19,7 @@ def test_complex_network(fix_inp: bool = True, noisy_actions: bool = False) -> f
     num_attempts: int = 1000
     for attempt in range(0, num_attempts):
         env: Env = create_env()
+        env.reward_distribution = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
         num_players: int = 2
         agents: List[ComplexNetwork] = [ComplexNetwork() for _ in range(0, num_players)]
         optimizers: List[Optimizer] = [Adam(params=agents[i].parameters()) for i in range(0, num_players)]
@@ -100,6 +101,6 @@ def test_transformer(fix_inp: bool = True, noisy_actions: bool = False) -> float
 
 if __name__ == '__main__':
     complex_network_success: float = test_complex_network()
-    transformer_success: float = test_transformer()
+    # transformer_success: float = test_transformer()
     print(f"ComplexNetwork: {complex_network_success}")
-    print(f"Transformer: {transformer_success}")
+    # print(f"Transformer: {transformer_success}")
