@@ -47,7 +47,7 @@ def train(num_epochs: int,
     for epoch in range(1, num_epochs + 1):
 
         # save model
-        if epoch % 1 == 0:
+        if epoch % 5 == 0:
             save_path: str = get_next_model_path()
             save(agent, save_path)
 
