@@ -74,4 +74,3 @@ def compute_relu_std(arr: Tensor) -> Tuple[ndarray, ndarray]:
     lower_stand_dev: ndarray = tensor(lower_stand_dev).numpy()
     stand_dev: Tuple[ndarray, ndarray] = (lower_stand_dev, upper_stand_dev)
     return stand_dev
-

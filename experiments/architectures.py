@@ -157,7 +157,7 @@ def make_plots():
     setp(axs[0], ylabel="d(s, s')")
     setp(axs[1], ylabel="d(s, s')")
 
-    show()
+    # show()
 
     save("experiments/plots/architectures.tex")
 

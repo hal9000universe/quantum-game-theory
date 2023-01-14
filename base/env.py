@@ -1,32 +1,13 @@
 # py
-from typing import List, Tuple, Callable, Optional
+from typing import List, Tuple, Optional
 
 # nn & rl
 from torch import Tensor, complex64, kron, tensor
 from torch.distributions import Distribution, Uniform
 
-# quantum
-from pennylane import qnode, QubitUnitary, probs, device, Device
-
 # lib
 from base.action_space import ActionSpace, GeneralActionSpace
 from base.quantum import QuantumSystem, Ops, Operator
-
-
-def create_circuit(num_players: int) -> Callable[[Tuple[Tensor, ...]], Tensor]:
-    dev: Device = device('default.qubit', wires=num_players)
-    all_wires: List[int] = [i for i in range(0, num_players)]
-    J: Tensor = Ops().J
-
-    @qnode(device=dev, interface='torch')
-    def circuit(*operators: Tuple[Tensor, ...]) -> Tensor:
-        QubitUnitary(J, wires=all_wires)
-        for wire, (operator) in enumerate(operators):
-            QubitUnitary(operator, wires=wire)
-        QubitUnitary(J.adjoint(), wires=all_wires)
-        return probs(all_wires)
-
-    return circuit
 
 
 class Env:
@@ -36,7 +17,6 @@ class Env:
     _ops: Ops
     _uniform: Distribution
     _reward_sampler: Distribution
-    _circuit: Callable[[Tuple[Tensor, ...]], Tensor]
     _state: QuantumSystem
     _J: Operator
     _nash_eq: Optional[Tensor]
@@ -50,10 +30,6 @@ class Env:
         self._state = QuantumSystem(self._num_players)
         self._J = self._ops.GeneralJ.inject(self._num_players)
         self._nash_eq = None
-        self._make_circuit()
-
-    def _make_circuit(self):
-        self._circuit = create_circuit(self._num_players)
 
     @property
     def nash_eq(self) -> Optional[Tensor]:
@@ -144,18 +120,5 @@ class Env:
         qs: List = []
         for i in range(self._num_players):
             q_i = (self._reward_distribution[:, i] * self._state.probs).sum()
-            qs.append(q_i)
-        return qs
-
-    def q_step(self, *args) -> List[Tensor]:
-        ops: List[Tensor] = []
-        for params in args:
-            op: Tensor = self._action_space.operator(params)
-            ops.append(op)
-        probabilities: Tensor = self._circuit(*ops)
-        # get q-values
-        qs: List = []
-        for i in range(self._num_players):
-            q_i = (self._reward_distribution[:, i] * probabilities).sum()
             qs.append(q_i)
         return qs

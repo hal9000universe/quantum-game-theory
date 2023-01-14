@@ -62,6 +62,7 @@ def test_transformer(fix_inp: bool = True, noisy_actions: bool = False) -> float
     num_encoder_layers: int = 2
     for attempt in range(0, num_attempts):
         env: Env = create_env()
+        env.reward_distribution = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
         num_players: int = 2
         agents: List[Transformer] = [Transformer(
             num_players=env.num_players,

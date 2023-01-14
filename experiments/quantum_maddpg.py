@@ -1,10 +1,8 @@
 # py
 from typing import Callable
 
-from math import pi
-
 # nn & rl
-from torch import Tensor, tensor, load, eye
+from torch import Tensor, tensor, eye
 from torch.optim import Adam
 
 # lib
