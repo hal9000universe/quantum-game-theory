@@ -19,25 +19,29 @@ from experiments.prisoners_dilemma import ComplexNetwork
 
 # plotting
 from matplotlib.pyplot import subplots, errorbar, show, setp
-from numpy import ndarray, linspace
+from numpy import array, ndarray, linspace
 from tikzplotlib import save
 
 
-def track_algorithm(model: type = Transformer):
+FAILS: bool = False
+
+
+def track_algorithm(pretrained: bool = False):
     # define variables
-    num_experiments: int = 300
+    test_ds: GameNashDataset = GameNashDataset(0.999, 1.)
+    print(f"Number of Quantum Games: {len(test_ds)}")
+    num_experiments: int = len(test_ds)
     episodes: int = 15
     plot_frequency: int = 1
     distances: Tensor = zeros((num_experiments, episodes // plot_frequency))
+    to_print: List[bool] = list()
 
     # training framework
     noisy_inputs: bool = False
     noisy_actions: bool = False
 
-    nash_eq: Tensor = tensor([[0., pi / 2], [0., pi / 2]])
-    for game in range(0, num_experiments):
-        reward_distribution: Tensor = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
-
+    for game, (reward_distribution, nash_eq) in enumerate(test_ds):
+        print(f"Game: {game}")
         # define quantum game
         env: Env = create_env()
         env.reward_distribution = reward_distribution
@@ -48,15 +52,14 @@ def track_algorithm(model: type = Transformer):
         agents: List[Module] = list()
         optimizers: List[Optimizer] = list()
         for _ in range(0, num_players):
-            if model == Transformer:
+            if pretrained:
+                player: Transformer = load(get_model_path(get_max_idx()))
+            else:
                 player: Transformer = Transformer(
                     num_players=num_players,
                     num_encoder_layers=num_encoder_layers,
                     num_actions=env.action_space.num_params,
                 )
-            else:
-                player: ComplexNetwork = ComplexNetwork()
-            # player = load(get_model_path(get_max_idx()))
             optim: Optimizer = Adam(params=player.parameters())
             agents.append(player)
             optimizers.append(optim)
@@ -85,10 +88,7 @@ def track_algorithm(model: type = Transformer):
                 # compute actions
                 actions: List[Tensor] = []
                 for i, player in enumerate(players):
-                    if model == Transformer:
-                        params: Tensor = player(state, reward_distribution, player_tokens[i])
-                    else:
-                        params: Tensor = player(state)
+                    params: Tensor = player(state, reward_distribution, player_tokens[i])
                     if noisy_actions:
                         params += uniform.sample(params.shape)
                     actions.append(params)
@@ -115,19 +115,26 @@ def track_algorithm(model: type = Transformer):
                 players, player_indices = static_order_players(num_players, agents)
                 actions: List[Tuple[Tensor, ...]] = []
                 for i, player in enumerate(players):
-                    if model == Transformer:
-                        params: Tensor = player(state, reward_distribution, player_tokens[i])
-                    else:
-                        params: Tensor = player(state)
+                    params: Tensor = player(state, reward_distribution, player_tokens[i])
                     actions.append(tuple(params))
                 actions: Tensor = tensor(actions)
                 distances[game, episode // plot_frequency] = calc_dist(nash_eq, actions, env.action_space.operator)
 
+            if episode == episodes - 1:
+                if distances[game, episode // plot_frequency] < 0.2:
+                    to_print.append(True)
+                else:
+                    to_print.append(FAILS)  # set to True/False to change the behaviour of the graph
+
     # compute plotting data
     x: ndarray = plot_frequency * linspace(0, distances.shape[1] - 1, distances.shape[1])
-    y: ndarray = distances.mean(0).numpy()
-    # stand_dev: ndarray = compute_oriented_std(distances, 0)
-    stand_dev: ndarray = compute_relu_std(distances)
+    ys: List[Tuple[Tensor, ...]] = list()
+    for idx, game_success_bool in enumerate(to_print):
+        if game_success_bool:
+            ys.append(tuple(distances[idx]))
+    ys_arr: Tensor = tensor(ys)
+    y: ndarray = ys_arr.mean(0).numpy()
+    stand_dev: ndarray = compute_relu_std(ys_arr)
 
     return x, y, stand_dev
 
@@ -141,16 +148,25 @@ def make_plots():
     fig.set_figwidth(12.)
 
     # generate data
-    x_cn, y_cn, std_cn = track_algorithm(model=ComplexNetwork)
-    x_tr, y_tr, std_tr = track_algorithm(model=Transformer)
+    x_scratch, y_scratch, std_scratch = track_algorithm(pretrained=False)
+    x_pretrained, y_pretrained, std_pretrained = track_algorithm(pretrained=True)
 
     # plot success rate data
-    axs[0].errorbar(x_cn, y_cn, yerr=std_cn, color='blue', ecolor='black', elinewidth=2, capsize=2., fmt='.k')
-    axs[0].set_title("Distanz zum Nash-Gleichgewicht")
+    axs[0].errorbar(x_scratch, y_scratch, yerr=std_scratch, color='blue', ecolor='black',
+                    elinewidth=2, capsize=2., fmt='.k')
+    axs[0].set_title("Ohne Pre-Training")
 
     # plot performance data
-    axs[1].errorbar(x_tr, y_tr, yerr=std_tr, color='blue', ecolor='black', elinewidth=2, capsize=2., fmt='.k')
-    axs[1].set_title("Distanz zum Nash-Gleichgewicht")
+    axs[1].errorbar(x_pretrained, y_pretrained, yerr=std_pretrained, color='blue',
+                    ecolor='black', elinewidth=2, capsize=2., fmt='.k')
+    axs[1].set_title("Mit Pre-Training")
+
+    if FAILS:
+        # adjust axis labels
+        locs = axs[0].get_yticks()
+        labels = axs[0].get_yticklabels()
+        axs[1].set_yticks(locs)
+        axs[1].set_yticklabels(labels)
 
     # label axes
     setp(axs, xlabel="Episoden")
@@ -159,7 +175,7 @@ def make_plots():
 
     # show()
 
-    save("experiments/plots/architectures.tex")
+    save("experiments/plots/maddpg_performance.tex")
 
 
 if __name__ == '__main__':

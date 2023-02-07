@@ -45,6 +45,7 @@ def perform_grad_desc(env: Env,
 def test_prisoners_grad_desc() -> float:
     num_successes: int = 0
     env: Env = create_env()
+    env.reward_distribution = tensor([[3., 3.], [0., 5.], [5., 0.], [1., 1.]])
     nash_eq: Tensor = tensor([[0., pi / 2], [0., pi / 2]])
 
     for attempt in range(0, 100):
