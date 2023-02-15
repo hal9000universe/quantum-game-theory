@@ -13,6 +13,7 @@ from base.env import Env
 
 
 def create_env() -> Env:
+    """creates an Env with a RestrictedActionSpace and a J operator as described in Eisert et al."""
     num_players: int = 2
     gamma: float = pi / 2
     D: Tensor = tensor([[0., 1.],
@@ -26,6 +27,8 @@ def create_env() -> Env:
 
 
 def calc_dist(nash_eq: Tensor, actions: Tensor, parametrization: Callable[[Tensor], Tensor]) -> Tensor:
+    """calculates a distance between the specified nash equilibrium and the actions taken by players,
+    given a parametrization which maps parameters to quantum operators."""
     dist: Tensor = tensor(0.)
     for i in range(0, nash_eq.shape[0]):
         nash_eq_op: Tensor = parametrization(nash_eq[i])

@@ -30,6 +30,21 @@ def train(episodes: int,
           env: Env,
           reward_distribution: Tensor,
           player_tokens: Tensor) -> List[Transformer]:
+    """The train function is an implementation of the
+    Multi-Agent Deep Deterministic Policy Gradient Algorithm for quantum games.
+
+    Keyword arguments
+    episodes: int specifying how many games are to be played.
+    fix_inp: bool specifying whether to add noise to the inputs as an exploration mechanism.
+    fix_inp_time: int specifying when to remove noise from the inputs (in case noise is used).
+    noisy_actions: bool specifying whether to add noise the actions as an exploration mechanism.
+    fix_actions_time: int specifying when to remove noise from the actions (in case noise is used).
+    num_players: int specifying the number of players needed for the given quantum game.
+    agents: a list of transformers which will play the game.
+    optimizers: a list of optimizers which will be applied to the agents.
+    env: Env handling the logic of the quantum game and the q-value computations.
+    reward_distribution: Tensor specifying the reward distribution of the quantum game to be played.
+    player_tokens: Tensor containing one_hot vectors indicating player positions."""
     # initialize noise distribution
     uniform: Distribution = Uniform(-0.25, 0.25)
     # loop over episodes
@@ -73,6 +88,7 @@ def training_framework(reward_distribution: Tensor,
                        load_model: bool = False,
                        noisy_inputs: bool = True,
                        noisy_actions: bool = False) -> Tensor:
+    """The training_framework function serves to eliminate or shorten repeated code (DRY)"""
     # define quantum game
     num_players: int = 2
     gamma: float = pi / 2

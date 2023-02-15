@@ -22,6 +22,7 @@ POST: int = 64
 
 
 class StateEmbedding(Module):
+    """The StateEmbedding Module embeds quantum states as sequences."""
     _pre_mat: Tensor
     _post_mat: Tensor
 
@@ -52,6 +53,7 @@ class StateEmbedding(Module):
 
 
 class RewardEmbedding(Module):
+    """The RewardEmbedding Module embed reward distributions as sequences."""
     _pre_mat: Tensor
     _post_mat: Tensor
 
@@ -79,6 +81,7 @@ class RewardEmbedding(Module):
 
 
 class PlayerTokenEmbedding(Module):
+    """The PlayerTokenEmbedding Module embeds player tokens as sequences."""
     _pre_mat: Tensor
     _post_mat: Tensor
 
@@ -108,6 +111,8 @@ class PlayerTokenEmbedding(Module):
 
 
 class Embedding(Module):
+    """The Embedding Module applies the StateEmbedding, RewardEmbedding and PlayerTokenEmbedding Modules
+    to an input and concatenates the resulting sequences."""
     _state_embedding: StateEmbedding
     _reward_embedding: RewardEmbedding
     _player_token_embedding: PlayerTokenEmbedding
@@ -169,6 +174,7 @@ class ClipContraction(Module):
 
 
 class SigmoidContraction(Module):
+    """The SigmoidContraction Module scales inputs to fit a specified parametrization of an ActionSpace."""
     _scaling: Tensor
     _translating: Tensor
 
@@ -184,6 +190,7 @@ class SigmoidContraction(Module):
 
 
 class ParametrizationModule(Module):
+    """The ParametrizationModule maps outputs of a Transformer Module to parameters of a quantum strategy."""
     _num_actions: int
     _linear1: Linear
     _linear2: Linear
@@ -239,6 +246,8 @@ class ParametrizationModule(Module):
 
 
 class Transformer(Module):
+    """The Transformer Module implements a Transformer, supported in its function to play quantum games
+    by an Embedding Module which transforms inputs and a ParametrizationModule which transformer outputs."""
     _embedding: Embedding
     _transformer_encoder_layers: List[TransformerEncoderLayer]
     _parametrization_module: ParametrizationModule

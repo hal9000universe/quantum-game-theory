@@ -8,6 +8,8 @@ from torch.nn.init import kaiming_normal_
 
 
 class ComplexNetwork(Module):
+    """The ComplexNetwork class implements a feed-forward neural network
+    which is capable of handling 4-dimensional complex inputs."""
     _lin1: Linear
     _lin2: Linear
     _lin3: Linear
@@ -15,11 +17,6 @@ class ComplexNetwork(Module):
 
     def __init__(self):
         super(ComplexNetwork, self).__init__()
-        """
-        initializes ComplexNetwork class.
-         ComplexNetwork implements a feed-forward neural network which is capable of handling 
-         4-dimensional complex inputs. 
-        """
         self._lin1 = Linear(4, 128, dtype=complex64)
         self._lin2 = Linear(128, 128, dtype=float32)
         self._lin3 = Linear(128, 2, dtype=float32)
@@ -40,5 +37,8 @@ class ComplexNetwork(Module):
         x = real(x)
         x = self._lin2(x)
         x = self._lin3(x)
-        x = self._scaling * sigmoid(x)
+        x = self._scaling * sigmoid(x)  # scales the output to fit the RestrictedActionSpace (base/action_space.py)
         return x
+
+
+# TODO: implement relu activations

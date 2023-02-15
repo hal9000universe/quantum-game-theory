@@ -8,6 +8,7 @@ from torch.nn.functional import one_hot
 
 
 def tens_pow(n: int, t: Tensor) -> Tensor:
+    """The tens_pow function applies the tensor product to a Tensor t and itself n times."""
     out: Tensor = t
     for i in range(1, n):
         out = kron(out, t)
@@ -15,14 +16,19 @@ def tens_pow(n: int, t: Tensor) -> Tensor:
 
 
 class QuantumSystem:
+    """The QuantumSystem class implements a simulation of simple qubit systems."""
     _state: Tensor
     _num_qubits: int
 
     def __init__(self, num_qubits: int):
+        """Attributes
+        _state: a Tensor containing the coefficients of the quantum state.
+        _num_qubits: int specifying the number of qubits in the system."""
         self._state = one_hot(tensor(0, dtype=int64), pow(2, num_qubits)).type(complex64)
         self._num_qubits = num_qubits
 
     def measure(self) -> Tensor:
+        """The measure method simulates the measurement process of a qubit system."""
         probs: Tensor = self._state.abs().square()
         dist: Distribution = Multinomial(probs=probs)
         measurement: Tensor = dist.sample(1)
@@ -49,6 +55,9 @@ class QuantumSystem:
 
 
 class Operator:
+    """The Operator class serves as a template for quantum operators.
+    Tensor products of Operators are implemented via the + operator.
+    Applying an operator to a QuantumSystem is implemented via the @ operator."""
     _mat: Tensor
 
     def __init__(self, mat: Tensor):
@@ -75,6 +84,7 @@ class Operator:
 
 
 class I(Operator):
+    """The identity operator leaving a quantum state unchanged."""
 
     def __init__(self, dims: int = 2):
         iden: Tensor = eye(dims).type(complex64)
@@ -86,6 +96,7 @@ class I(Operator):
 
 
 class PauliX(Operator):
+    """The pauli_x operator switching the coefficients of a single qubit state."""
 
     def __init__(self):
         pauli_x: Tensor = tensor([[0., 1.],
@@ -94,6 +105,7 @@ class PauliX(Operator):
 
 
 class PauliY(Operator):
+    """The pauli_y operator."""
 
     def __init__(self):
         pauli_y: Tensor = tensor([[0., -1j],
@@ -102,6 +114,7 @@ class PauliY(Operator):
 
 
 class PauliZ(Operator):
+    """The pauli_z operator."""
 
     def __init__(self):
         pauli_z: Tensor = tensor([[1., 0.],
@@ -110,6 +123,7 @@ class PauliZ(Operator):
 
 
 class RotX(Operator):
+    """The x-rotation operator."""
 
     def __init__(self, rotx: Tensor = PauliX().mat):
         super(RotX, self).__init__(mat=rotx)
@@ -122,6 +136,7 @@ class RotX(Operator):
 
 
 class RotY(Operator):
+    """The y-rotation operator."""
 
     def __init__(self, rotx: Tensor = PauliY().mat):
         super(RotY, self).__init__(mat=rotx)
@@ -134,6 +149,7 @@ class RotY(Operator):
 
 
 class RotZ(Operator):
+    """The z-rotation operator."""
 
     def __init__(self, rotx: Tensor = PauliZ().mat):
         super(RotZ, self).__init__(mat=rotx)
@@ -146,6 +162,7 @@ class RotZ(Operator):
 
 
 class H(Operator):
+    """The hadamard operator bringing a qubit into a uniform superposition."""
 
     def __init__(self):
         hada = tensor([[1., 1.],
@@ -154,6 +171,8 @@ class H(Operator):
 
 
 class CNOT(Operator):
+    """The CNOT operator maximally entangling two qubits,
+    after the hadamard operator is applied to the control qubit."""
 
     def __init__(self):
         cnot: Tensor = tensor([[1., 0., 0., 0.],
@@ -164,6 +183,7 @@ class CNOT(Operator):
 
 
 class GeneralJ(Operator):
+    """The J Operator maximally entangling an arbitrary number of qubits as described in Multi-Player Quantum Games."""
 
     def __init__(self, num_players: int = 2):
         prep: Tensor = 1 / tensor(2.).sqrt() * (
@@ -176,6 +196,8 @@ class GeneralJ(Operator):
 
 
 class J(Operator):
+    """The J Operator maximally entangling two qubits as described
+    in Quantum Games and Quantum Strategies by Eisert et al."""
 
     def __init__(self, gamma: float = pi / 2):
         D: Tensor = tensor([[0., 1.],
@@ -188,28 +210,8 @@ class J(Operator):
         return cls(gamma)
 
 
-class U(Operator):
-
-    def __init__(self):
-        mat: Tensor = eye(2).type(complex64)
-        super(U, self).__init__(mat=mat)
-
-    @classmethod
-    def inject(cls, theta: Tensor, phi: Tensor, psi: Tensor) -> Operator:
-        a: Tensor = cos(theta / 2)
-        b: Tensor = sin(theta / 2)
-        c: Tensor = -exp(1j * psi)
-        d: Tensor = exp(1j * phi)
-        e: Tensor = exp(1j * (phi + psi))
-        # construct the rows of the rotation matrix
-        r1: Tensor = cat((a.view(1), (b * c).view(1)))
-        r2: Tensor = cat(((b * d).view(1), (a * e).view(1)))
-        # build and return the rotation matrix
-        rot: Tensor = cat((r1, r2)).view(2, 2)
-        return Operator(mat=rot)
-
-
 class Ops:
+    """A collection of quantum operators."""
     _I: I
     _sx: PauliX
     _sy: PauliY
@@ -220,7 +222,6 @@ class Ops:
     _RotX: RotX
     _RotY: RotY
     _RotZ: RotZ
-    _U: U
 
     def __init__(self):
         self._I = I()
@@ -234,7 +235,6 @@ class Ops:
         self._RotX = RotX()
         self._RotY = RotY()
         self._RotZ = RotZ()
-        self._U = U()
 
     @property
     def I(self) -> I:
@@ -279,7 +279,3 @@ class Ops:
     @property
     def RotZ(self) -> RotZ:
         return self._RotZ
-
-    @property
-    def U(self) -> U:
-        return self._U
