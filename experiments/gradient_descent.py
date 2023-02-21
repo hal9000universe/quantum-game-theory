@@ -14,6 +14,11 @@ from base.action_space import RestrictedActionSpace
 from dataset.dataset import MicroGameNashDataset
 
 
+"""This file shows how gradient descent could be directly applied to the parameters of an action 
+in a quantum game (instead of having a neural network as an intermediate representation). However, 
+employing neural networks allows for pre-training and is empirically more reliable."""
+
+
 def generate_parameters() -> Tensor:
     uniform_theta: Distribution = Uniform(0., pi)
     uniform_phi: Distribution = Uniform(0., pi/2)

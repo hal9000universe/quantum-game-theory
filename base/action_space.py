@@ -9,9 +9,12 @@ from torch import Tensor, tensor, linspace, exp, cos, sin, cat
 from base.quantum import Ops
 
 
+"""This file is about action spaces of quantum games."""
+
+
 class ActionSpace:
     """The ActionSpace class serves as a general template
-    for implementing action spaces which can easily be integrated
+    for implementing action spaces which can be integrated easily
     into the rest of the code. By subclassing and implementing
     the operator method, new actions spaces can be created.
     To integrate new action spaces into the quantum game

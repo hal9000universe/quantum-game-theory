@@ -10,6 +10,9 @@ from base.action_space import ActionSpace, RestrictedActionSpace
 from base.quantum import QuantumSystem, Ops, Operator
 
 
+"""This file is all about representing quantum games as a reinforcement learning environment."""
+
+
 class Env:
     """The Env class represents a general environment for quantum games."""
     _reward_distribution: Optional[Tensor]

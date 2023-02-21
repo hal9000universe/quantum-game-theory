@@ -8,6 +8,9 @@ from torch.nn import TransformerEncoderLayer, Module, Linear
 from torch.nn.init import kaiming_normal_
 
 
+"""This file is about the Transformer architecture for quantum games."""
+
+
 class UnwantedError(Exception):
 
     def __init__(self, message: str):

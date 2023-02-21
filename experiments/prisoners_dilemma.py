@@ -14,7 +14,13 @@ from base.complex_network import ComplexNetwork
 from base.transformer import Transformer
 
 
+"""This file compares the performance of the maddpg algorithm using either ComplexNetwork or Transformer
+in the quantum prisoner's dilemma."""
+
+
 def test_complex_network(fix_inp: bool = True, noisy_actions: bool = False) -> float:
+    """The test_complex_network function repeatedly applies the maddpg algorithm to a ComplexNetwork
+    in the quantum prisoner's dilemma and computes the success frequency."""
     num_successes: int = 0
     num_attempts: int = 1000
     for attempt in range(0, num_attempts):
@@ -54,6 +60,8 @@ def test_complex_network(fix_inp: bool = True, noisy_actions: bool = False) -> f
 
 
 def test_transformer(fix_inp: bool = True, noisy_actions: bool = False) -> float:
+    """The test_transformer function repeatedly applies the maddpg algorithm to a Transformer
+    in the quantum prisoner's dilemma and computes the success frequency."""
     # variables
     num_successes: int = 0
     num_attempts: int = 1000
@@ -102,6 +110,6 @@ def test_transformer(fix_inp: bool = True, noisy_actions: bool = False) -> float
 
 if __name__ == '__main__':
     complex_network_success: float = test_complex_network()
-    # transformer_success: float = test_transformer()
+    transformer_success: float = test_transformer()
     print(f"ComplexNetwork: {complex_network_success}")
-    # print(f"Transformer: {transformer_success}")
+    print(f"Transformer: {transformer_success}")

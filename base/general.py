@@ -1,10 +1,11 @@
 # py
 from math import pi
-from typing import Tuple, List
+from typing import Tuple, List, Callable
+from copy import copy
 
 # nn & rl
-from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, load
-from torch.optim import Adam, Optimizer
+from torch import tensor, Tensor, kron, complex64, eye, matrix_exp, load, zeros
+from torch.optim import Adam, Optimizer, AdamW
 from torch.distributions import Distribution, Uniform
 
 # lib
@@ -12,7 +13,10 @@ from base.quantum import Operator
 from base.env import Env
 from base.action_space import ActionSpace, RestrictedActionSpace
 from base.transformer import Transformer
-from training.training import get_max_idx, get_model_path
+from training.training import get_max_idx, get_mixed_model_path
+
+
+"""This file is all about the maddpg algorithm."""
 
 
 def static_order_players(num_players: int, agents: List[Transformer]) -> Tuple[List[Transformer], List[int]]:
@@ -47,6 +51,9 @@ def train(episodes: int,
     player_tokens: Tensor containing one_hot vectors indicating player positions."""
     # initialize noise distribution
     uniform: Distribution = Uniform(-0.25, 0.25)
+    # initialize variables for an early stopping mechanism
+    last_action: Tensor = zeros((env.action_space.num_params,))
+    new_action: Tensor
     # loop over episodes
     for step in range(1, episodes):
         # get state from environment
@@ -55,9 +62,10 @@ def train(episodes: int,
         # sample players for the game
         players, player_indices = static_order_players(num_players, agents)
 
+        copy_actions: List[Tensor] = list()
         for player_idx in player_indices:
-            # compute actions
             actions: List[Tensor] = []
+            # compute actions
             for i, player in enumerate(players):
                 params: Tensor = player(state, reward_distribution, player_tokens[i])
                 if noisy_actions:
@@ -75,6 +83,15 @@ def train(episodes: int,
             loss_idx.backward()
             optimizers[player_idx].step()
 
+            copy_actions = copy(actions)
+
+        # compute significance of action change
+        new_action = copy_actions[0]
+        dist = (new_action - last_action).norm()
+        if dist < 1e-7:  # early stopping
+            print("Stopped training early.")
+            break
+
         if step == fix_inp_time:
             fix_inp = True
 
@@ -87,7 +104,8 @@ def train(episodes: int,
 def training_framework(reward_distribution: Tensor,
                        load_model: bool = False,
                        noisy_inputs: bool = True,
-                       noisy_actions: bool = False) -> Tensor:
+                       noisy_actions: bool = False,
+                       model_path_fun: Callable[[int], str] = get_mixed_model_path) -> Tensor:
     """The training_framework function serves to eliminate or shorten repeated code (DRY)"""
     # define quantum game
     num_players: int = 2
@@ -110,19 +128,19 @@ def training_framework(reward_distribution: Tensor,
     optimizers: List[Optimizer] = list()
     for _ in range(0, num_players):
         if load_model:
-            player: Transformer = load(get_model_path(get_max_idx()))
+            player: Transformer = load(model_path_fun(get_max_idx(model_path_fun)))
         else:
             player: Transformer = Transformer(
                 num_players=num_players,
                 num_encoder_layers=num_encoder_layers,
                 num_actions=env.action_space.num_params,
             )
-        optim: Optimizer = Adam(params=player.parameters())
+        optim: Optimizer = AdamW(params=player.parameters())
         agents.append(player)
         optimizers.append(optim)
 
     # define hyperparameters
-    episodes: int = 100
+    episodes: int = 50
     fix_inp: bool = not noisy_inputs
     fix_inp_time: int = int(episodes * 0.6)
     fix_actions_time: int = int(episodes * 0.6)

@@ -12,9 +12,59 @@ from torch.nn.modules import HuberLoss
 from base.utils import create_env
 from base.env import Env
 from base.transformer import Transformer
-from dataset.dataset import QuantumTrainingDataset, MicroQuantumTrainingDataset
+from dataset.dataset import QuantumTrainingDataset, MicroQuantumTrainingDataset, get_mixed_mqt_path, get_random_mqt_path, get_symmetric_mqt_path
 
 
+"""This file is about pretraining a transformer on a quantum game dataset."""
+
+
+# The following functions help to find paths of pretrained models
+def get_mixed_model_path(idx: int) -> str:
+    return f"training/models/mixed/transformer-{idx}.pt"
+
+
+def get_random_model_path(idx: int) -> str:
+    return f"training/models/random/transformer-{idx}.pt"
+
+
+def get_symmetric_model_path(idx: int) -> str:
+    return f"training/models/symmetric/transformer-{idx}.pt"
+
+
+# maps a function for the path of some data to a function for the path of a model trained on that data
+def path_fun_map(data_path_fun: Callable[[int], str]) -> Callable[[int], str]:
+    path_fun_name: str = data_path_fun.__name__
+    if path_fun_name == "get_mixed_mqt_path":
+        return get_mixed_model_path
+    elif path_fun_name == "get_random_mqt_path":
+        return get_random_model_path
+    elif path_fun_name == "get_symmetric_mqt_path":
+        return get_symmetric_model_path
+    elif path_fun_name == "get_mixed_gn_path":
+        return get_mixed_model_path
+    elif path_fun_name == "get_random_gn_path":
+        return get_random_model_path
+    elif path_fun_name == "get_symmetric_gn_path":
+        return get_symmetric_model_path
+    else:
+        print("Unexpected behaviour occurred in: path_fun_map.")
+        exit()
+
+
+# calculates the index of the most trained model depending on the kind of data it was trained on
+def get_max_idx(path_fun: Callable[[int], str] = get_mixed_model_path) -> int:
+    is_max: bool = False
+    idx: int = 0
+    while not is_max:
+        path: str = path_fun(idx + 1)
+        if exists(path):
+            idx += 1
+            continue
+        else:
+            return idx
+
+
+# computes the validation loss for a model
 def validate(val_ds: DataLoader, loss_function: Callable[[Tensor, Tensor], Tensor], agent: Transformer) -> Tensor:
     val_losses: List[Tensor] = list()
     for x_batch, nash_batch in val_ds:
@@ -24,6 +74,7 @@ def validate(val_ds: DataLoader, loss_function: Callable[[Tensor, Tensor], Tenso
     return tensor(val_losses).mean(0)
 
 
+# computes the test loss for a model
 def test(test_ds: QuantumTrainingDataset, agent: Transformer) -> Tensor:
     loss_function: Callable[[Tensor, Tensor], Tensor] = HuberLoss()
     test_losses: List[Tensor] = list()
@@ -38,7 +89,8 @@ def train(num_epochs: int,
           agent: Transformer,
           optimizer: Optimizer,
           train_ds: DataLoader,
-          val_ds: DataLoader) -> Transformer:
+          val_ds: DataLoader,
+          path_fun: Callable[[int], str] = get_mixed_model_path) -> Transformer:
 
     # initialize huber loss function
     loss_function: Callable[[Tensor, Tensor], Tensor] = HuberLoss()
@@ -47,51 +99,33 @@ def train(num_epochs: int,
     for epoch in range(1, num_epochs + 1):
 
         # save model
-        if epoch % 5 == 0:
-            save_path: str = get_next_model_path()
-            save(agent, save_path)
+        if epoch % 1 == 0:
+            save(agent, path_fun(epoch))
 
-        train_losses: List[Tensor] = list()
+        train_losses: List[Tensor] = list()  # variable to store losses
         for i, (x_batch, nash_batch) in enumerate(train_ds):
-            action_batch: Tensor = agent(*x_batch)
-            loss: Tensor = loss_function(action_batch, nash_batch)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            train_losses.append(loss)
+            action_batch: Tensor = agent(*x_batch)  # process data and get actions
+            loss: Tensor = loss_function(action_batch, nash_batch)  # compute distance to nash equilibrium
+            optimizer.zero_grad()  # delete gradients
+            loss.backward()  # back-propagate gradients
+            optimizer.step()  # update weights
+            train_losses.append(loss)  # store losses
 
             # monitoring
-            if i % 50 == 0:
+            if i % 100 == 0:
                 mean_val_loss: Tensor = validate(val_ds, loss_function, agent)
                 mean_train_loss: Tensor = tensor(train_losses).mean(0)
-                print(f"Episode: {epoch} - Train Loss: {mean_train_loss} - Validation Loss: {mean_val_loss}")
+                print(f"Episode: {epoch}.{i} - Train Loss: {mean_train_loss} - Validation Loss: {mean_val_loss}")
+
+    # save trained agent
+    save(agent, path_fun(get_max_idx(path_fun)))
 
     # return trained agent
     return agent
 
 
-def get_max_idx() -> int:
-    is_max: bool = False
-    idx: int = -1
-    while not is_max:
-        path: str = get_model_path(idx + 1)
-        if exists(path):
-            idx += 1
-            continue
-        else:
-            return idx
-
-
-def get_model_path(idx: int) -> str:
-    return f"training/models/transformer-{idx}.pt"
-
-
-def get_next_model_path() -> str:
-    next_idx: int = get_max_idx() + 1
-    return get_model_path(next_idx)
-
-
-def main():
+# trains an agent on a given dataset (identified by its path)
+def main(data_path_fun: Callable[[int], str] = get_mixed_model_path):
     # create environment
     env: Env = create_env()
     # define hyperparameters
@@ -109,19 +143,20 @@ def main():
     # load datasets
     batch_size: int = 64
     # train dataset
-    qt_train_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0., end=0.8)
+    model_path_fun: Callable[[int], str] = path_fun_map(data_path_fun)
+    qt_train_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0., end=0.8, path_fun=data_path_fun)
     train_data_loader: DataLoader = DataLoader(
         dataset=qt_train_ds,
         batch_size=batch_size,
     )
     # validation dataset
-    qt_val_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.8, end=0.9)
+    qt_val_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.8, end=0.9, path_fun=data_path_fun)
     val_data_loader: DataLoader = DataLoader(
         dataset=qt_val_ds,
         batch_size=batch_size,
     )
     # test dataset
-    qt_test_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.9, end=1.)
+    qt_test_ds: QuantumTrainingDataset = QuantumTrainingDataset(start=0.9, end=1., path_fun=data_path_fun)
 
     # training
     num_epochs: int = 40
@@ -131,18 +166,15 @@ def main():
         optimizer=adam,
         train_ds=train_data_loader,
         val_ds=val_data_loader,
+        path_fun=model_path_fun,
     )
 
     # testing
     test_loss: Tensor = test(qt_test_ds, agent)
     print(f"Test Loss: {test_loss}")
 
-    # save model
-    save_path: str = get_next_model_path()
-    save(agent, save_path)
-
     # load
-    agent: Transformer = load(get_model_path(get_max_idx()))
+    agent: Transformer = load(model_path_fun(get_max_idx(model_path_fun)))
 
     # testing after loading
     test_loss: Tensor = test(qt_test_ds, agent)
@@ -150,4 +182,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(data_path_fun=get_symmetric_mqt_path)

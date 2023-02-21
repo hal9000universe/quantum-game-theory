@@ -23,7 +23,14 @@ from numpy import ndarray, linspace
 from tikzplotlib import save
 
 
+"""This file enables easy visualization ComplexNetwork and Transformer architecture performance
+in the quantum prisoner's dilemma."""
+
+
 def track_algorithm(model: type = Transformer):
+    """This function applies the maddpg-algorithm to a ComplexNetwork or Transformer
+    and tracks the performance of the algorithm throughout the training-process such that
+    it can be visualized."""
     # define variables
     num_experiments: int = 300
     episodes: int = 15
@@ -56,7 +63,6 @@ def track_algorithm(model: type = Transformer):
                 )
             else:
                 player: ComplexNetwork = ComplexNetwork()
-            # player = load(get_model_path(get_max_idx()))
             optim: Optimizer = Adam(params=player.parameters())
             agents.append(player)
             optimizers.append(optim)
@@ -126,13 +132,14 @@ def track_algorithm(model: type = Transformer):
     # compute plotting data
     x: ndarray = plot_frequency * linspace(0, distances.shape[1] - 1, distances.shape[1])
     y: ndarray = distances.mean(0).numpy()
-    # stand_dev: ndarray = compute_oriented_std(distances, 0)
     stand_dev: ndarray = compute_relu_std(distances)
 
     return x, y, stand_dev
 
 
 def make_plots():
+    """This function generates a tikz-file comparing the ComplexNetwork and Transformer architectures
+    in the quantum prisoner's dilemma."""
     # set up plot
     nrows: int = 1
     ncols: int = 2
@@ -156,8 +163,6 @@ def make_plots():
     setp(axs, xlabel="Episoden")
     setp(axs[0], ylabel="d(s, s')")
     setp(axs[1], ylabel="d(s, s')")
-
-    # show()
 
     save("experiments/plots/architectures.tex")
 

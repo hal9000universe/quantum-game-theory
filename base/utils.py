@@ -1,5 +1,5 @@
 # py
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Optional
 from math import pi
 
 # nn & rl
@@ -12,7 +12,10 @@ from base.action_space import RestrictedActionSpace
 from base.env import Env
 
 
-def create_env() -> Env:
+"""This file contains utility functions for the project."""
+
+
+def create_env(reward_distribution: Optional[Tensor] = None) -> Env:
     """creates an Env with a RestrictedActionSpace and a J operator as described in Eisert et al."""
     num_players: int = 2
     gamma: float = pi / 2
@@ -23,6 +26,8 @@ def create_env() -> Env:
     env: Env = Env(num_players=num_players)
     env.action_space = RestrictedActionSpace()
     env.J = J
+    if reward_distribution is not None:
+        env.reward_distribution = reward_distribution
     return env
 
 

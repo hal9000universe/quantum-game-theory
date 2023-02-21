@@ -2,9 +2,12 @@
 from math import pi
 
 # nn & rl
-from torch import Tensor, tensor, complex64, sigmoid, real, float32
+from torch import Tensor, tensor, complex64, sigmoid, real, float32, relu
 from torch.nn import Linear, Module
 from torch.nn.init import kaiming_normal_
+
+
+"""This file is about the ComplexNetwork architecture."""
 
 
 class ComplexNetwork(Module):
@@ -35,10 +38,9 @@ class ComplexNetwork(Module):
     def __call__(self, x: Tensor, *args) -> Tensor:
         x = self._lin1(x)
         x = real(x)
+        x = relu(x)
         x = self._lin2(x)
+        x = relu(x)
         x = self._lin3(x)
         x = self._scaling * sigmoid(x)  # scales the output to fit the RestrictedActionSpace (base/action_space.py)
         return x
-
-
-# TODO: implement relu activations

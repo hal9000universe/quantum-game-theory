@@ -23,7 +23,13 @@ from numpy import array, ndarray, linspace
 from tikzplotlib import save
 
 
-FAILS: bool = False
+"""This file visually compares the quantum-maddpg algorithm with a pre-trained transformer 
+and a randomly initialized transformer."""
+
+
+FAILS: bool = False  # if set to True, the generated graph will not just contain examples
+# where the algorithm was successful, but also ones where the maddpg algorithm failed (as a consequence
+# the message of the graph that the pre-trained transformer starts closer to the nash-equilibrium is corrupted).
 
 
 def track_algorithm(pretrained: bool = False):
@@ -140,6 +146,8 @@ def track_algorithm(pretrained: bool = False):
 
 
 def make_plots():
+    """This function generates a tikz-file showing a graph comparing a randomly
+    initialized transformer and a pre-trained one."""
     # set up plot
     nrows: int = 1
     ncols: int = 2
@@ -172,8 +180,6 @@ def make_plots():
     setp(axs, xlabel="Episoden")
     setp(axs[0], ylabel="d(s, s')")
     setp(axs[1], ylabel="d(s, s')")
-
-    # show()
 
     save("experiments/plots/maddpg_performance.tex")
 

@@ -10,6 +10,10 @@ from torch import Tensor, tensor
 from base.env import Env
 
 
+"""This file is about finding nash equilibria of quantum games by discretizing action spaces 
+and looping over all possible action combinations."""
+
+
 def is_nash(equilibrium: List, env: Env) -> bool:
     """The is_nash function checks if a set of strategies is the nash equilibrium of a quantum game.
 
